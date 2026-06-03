@@ -230,6 +230,28 @@ def build_feature_panel(
         if src in out.columns and dst not in out.columns:
             out[dst] = out[src]
 
+    # The assemble step prefixes every FMP column with its endpoint name
+    # (e.g. ``income_statement_netIncome``). The fundamental feature modules
+    # (quality / leverage_growth / valuation) look for the *unprefixed* FMP
+    # field. Strip prefixes here; on collision (same field appears in two
+    # endpoints) prefer income_statement > balance_sheet > cash_flow >
+    # ratios > key_metrics > financial_growth > enterprise_values.
+    _ENDPOINT_PREFIXES = (
+        "income_statement_",
+        "balance_sheet_",
+        "cash_flow_",
+        "ratios_",
+        "key_metrics_",
+        "financial_growth_",
+        "enterprise_values_",
+    )
+    for pref in _ENDPOINT_PREFIXES:
+        for c in list(out.columns):
+            if c.startswith(pref):
+                bare = c[len(pref):]
+                if bare and bare not in out.columns:
+                    out[bare] = out[c]
+
     n0_rows, n0_cols = out.shape
     logger.info(
         f"build_feature_panel: start | rows={n0_rows:,} cols={n0_cols} "
@@ -238,16 +260,53 @@ def build_feature_panel(
     )
 
     for fam in fams:
-        before = out.shape[1]
+        before_cols = set(out.columns)
+        before_n = out.shape[1]
         try:
             fn = _family_panel_fn(fam)
-            out = fn(out)
+            result = fn(out)
         except Exception as exc:
-            # Surface the family that failed but don't swallow - upstream
-            # pipeline needs to know a feature family is broken.
             logger.error(f"feature family '{fam}' failed: {exc}")
             raise
-        added = out.shape[1] - before
+
+        # Family modules disagreed at agent-write time on the return contract:
+        # some AUGMENT the input (return the panel + new columns), others
+        # REPLACE the input (return keys + new features only). Detect the
+        # latter and merge the new feature columns back onto our running panel
+        # so we never lose the panel-level identifiers / fundamentals.
+        new_cols = [c for c in result.columns if c not in before_cols]
+        replaced = not before_cols.issubset(result.columns)
+        if replaced and new_cols:
+            # Find the join keys present in both
+            key_candidates = [k for k in ("date", "symbol", "Date", "Symbol", "Ticker", "ticker")
+                              if k in result.columns and k in out.columns]
+            # Prefer (date, symbol) but fall back to whatever overlap we have.
+            join_keys = []
+            for prefer in (["date", "symbol"], ["Date", "Symbol"], ["Date", "Ticker"]):
+                if all(k in key_candidates for k in prefer):
+                    join_keys = prefer
+                    break
+            if not join_keys:
+                # Last-ditch: use whatever overlap exists.
+                join_keys = key_candidates[:2]
+            if not join_keys:
+                logger.warning(
+                    f"family '{fam}' returned a fresh frame but no join keys "
+                    f"overlap with the panel — appending positional concat"
+                )
+                # Positional concat aligned by index reset on both sides.
+                result = result[new_cols].reset_index(drop=True)
+                out = out.reset_index(drop=True)
+                out = pd.concat([out, result], axis=1)
+            else:
+                logger.info(
+                    f"  family '{fam}' returned a fresh frame; merging "
+                    f"{new_cols} on {join_keys}"
+                )
+                out = out.merge(result[[*join_keys, *new_cols]], on=join_keys, how="left")
+        else:
+            out = result
+        added = out.shape[1] - before_n
         logger.info(f"  + {fam}_panel: +{added} cols -> {out.shape[1]} total")
 
     if cross_sectional:

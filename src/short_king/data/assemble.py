@@ -110,13 +110,15 @@ def _asof_join_price(
     """Attach last adjClose / volume on or before Date per Symbol (within tolerance)."""
     px = prices.loc[:, ["symbol", "date", "adjClose", "volume"]].dropna(subset=["adjClose"])
     px = px[px["adjClose"] > 0].copy()
-    px["date"] = pd.to_datetime(px["date"])
+    # Force nanosecond precision on BOTH sides — parquet round-trips can leave
+    # ms/us precision which makes pandas' merge_asof refuse to merge.
+    px["date"] = pd.to_datetime(px["date"]).astype("datetime64[ns]")
     # ``merge_asof`` requires the ``on`` key globally sorted (not just sorted
     # within each ``by`` group).
     px = px.sort_values("date").reset_index(drop=True)
 
     left = asic[["Symbol", "Date"]].copy()
-    left["Date"] = pd.to_datetime(left["Date"]).dt.normalize()
+    left["Date"] = pd.to_datetime(left["Date"]).dt.normalize().astype("datetime64[ns]")
     left = left.sort_values("Date").reset_index(drop=True)
 
     out = pd.merge_asof(
@@ -139,11 +141,12 @@ def _asof_join_fundamentals(
     Returns the join keys plus ``period_end`` and ``filing_lag_days``.
     """
     left = asic[["Symbol", "Date"]].copy()
-    left["Date"] = pd.to_datetime(left["Date"]).dt.normalize()
+    left["Date"] = pd.to_datetime(left["Date"]).dt.normalize().astype("datetime64[ns]")
     # Both sides must be globally sorted on their respective ``on`` columns.
     left = left.sort_values("Date").reset_index(drop=True)
 
     right = filings.rename(columns={"symbol": "Symbol"}).copy()
+    right["acceptedDate"] = pd.to_datetime(right["acceptedDate"]).astype("datetime64[ns]")
     right = right.sort_values("acceptedDate").reset_index(drop=True)
 
     out = pd.merge_asof(
@@ -175,19 +178,21 @@ def _forward_returns_from_prices(
     """
     px = prices.loc[:, ["symbol", "date", "adjClose"]].dropna(subset=["adjClose"])
     px = px[px["adjClose"] > 0].copy()
-    px["date"] = pd.to_datetime(px["date"])
+    # Force ns precision on the date column - parquet round-trips can produce
+    # ms/us which breaks pandas merge_asof's dtype check.
+    px["date"] = pd.to_datetime(px["date"]).astype("datetime64[ns]")
     # Global sort on the ``on`` key (required by ``merge_asof`` with ``by``).
     px = px.sort_values("date").reset_index(drop=True)
     px_renamed = px.rename(columns={"symbol": "Symbol", "date": "_target", "adjClose": "_fwd_px"})
 
     base = asic[["Symbol", "Date", "adjClose"]].copy()
-    base["Date"] = pd.to_datetime(base["Date"]).dt.normalize()
+    base["Date"] = pd.to_datetime(base["Date"]).dt.normalize().astype("datetime64[ns]")
 
     tol = pd.Timedelta(days=PRICE_TOLERANCE_DAYS)
     out = base[["Symbol", "Date"]].copy()
     for h in horizons_weeks:
         target = base[["Symbol", "Date"]].copy()
-        target["_target"] = target["Date"] + pd.Timedelta(weeks=h)
+        target["_target"] = (target["Date"] + pd.Timedelta(weeks=h)).astype("datetime64[ns]")
         target = target.sort_values("_target").reset_index(drop=True)
         joined = pd.merge_asof(
             target,
@@ -278,6 +283,17 @@ def assemble_pit_panel(
             continue
         df = _normalise_dates(df.copy(), ("date", "acceptedDate", "filingDate"))
         keep_cols = ("symbol", "fiscalYear", "period")
+        # Some FMP endpoints (notably enterprise_values) lack fiscalYear/period
+        # -- they're keyed only by period-end ``date``. We can't PIT-join those
+        # by the fiscal key, so we skip them with a warning. (A future
+        # enhancement would asof-join them on ``period_end`` instead.)
+        missing = [k for k in keep_cols if k not in df.columns]
+        if missing:
+            logger.warning(
+                f"assemble: skipping endpoint '{ep}' - missing join keys {missing}. "
+                f"Available columns: {list(df.columns)[:8]}..."
+            )
+            continue
         # 'date' and 'acceptedDate' from core endpoints are already represented
         # by 'period_end' / 'acceptedDate' on the panel -- drop to avoid clobber.
         df = df.drop(columns=[c for c in ("date", "acceptedDate", "filingDate") if c in df.columns])
