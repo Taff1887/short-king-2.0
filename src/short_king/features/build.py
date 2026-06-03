@@ -41,43 +41,75 @@ FEATURE_FAMILIES: list[str] = [
     "leverage_growth",
 ]
 
+# Each family lives in its own ``short_king.features.<module>`` and exposes a
+# panel-building function; names diverged at agent-write time so we resolve
+# explicitly here rather than via a brittle string template.
+_FAMILY_MODULE: dict[str, tuple[str, str]] = {
+    "short":            ("short_signals",    "short_signals_panel"),
+    "price":            ("price",            "price_features_panel"),
+    "liquidity":        ("liquidity",        "liquidity_features_panel"),
+    "valuation":        ("valuation",        "valuation_features_panel"),
+    "quality":          ("quality",          "quality_features_panel"),
+    "leverage_growth":  ("leverage_growth",  "leverage_growth_panel"),
+}
+
 # Columns that are panel identifiers / labels / passthroughs - never ranked,
 # never sector-dummied, never reported as features.
 _ID_COLS: frozenset[str] = frozenset(
     {
-        "Ticker",
-        "ticker",
-        "symbol",
-        "Date",
-        "date",
-        "sector",
-        "industry",
-        "exchange",
-        "name",
-        "company",
-        "investable",
-        "period_end",
+        # primary keys (both cases — we alias)
+        "Ticker", "ticker", "symbol", "Symbol",
+        "Date", "date",
+        "ReleaseDate",
+        # metadata
+        "sector", "industry", "exchange",
+        "name", "company", "Company",
+        "investable", "period_end",
+        "has_price", "has_fundamentals", "fresh_filing",
+        "suspect_week", "excluded_corrupted",
+        "fiscalYear", "period", "acceptedDate",
+        "filing_lag_days", "filing_stale_quarters",
+        # raw inputs (price levels, share counts) — not factors, don't rank
+        "adjClose", "close",
+        "mktCap", "marketCap",
+        "sharesOutstanding",
+        "volume", "weekly_volume",
+        "ShortPositions", "TotalVolume",
+        # NOTE: ShortPct stays OUT of ID cols so it becomes ShortPct_rk —
+        # that's the naive baseline's input ("rank stocks by short percentage").
     }
 )
 
 # Forward-return / label columns produced by the data layer. We must never rank
 # these (would leak the label into the feature matrix) or sector-dummy them.
-_LABEL_PREFIXES: tuple[str, ...] = ("ret_fwd", "y_", "label_", "target")
+# Cover BOTH naming styles produced upstream: ``fwd_ret_*w`` (current assemble
+# output) and ``ret_fwd_*w`` (the spec name). Belt-and-braces.
+_LABEL_PREFIXES: tuple[str, ...] = (
+    "fwd_ret",
+    "ret_fwd",
+    "y_",
+    "label_",
+    "target",
+)
 
 
 def _family_panel_fn(family: str) -> Callable[[pd.DataFrame], pd.DataFrame]:
-    """Resolve ``<family>_panel`` from ``short_king.features.<family>`` lazily.
+    """Resolve the panel-building function for ``family`` (see ``_FAMILY_MODULE``).
 
     Import is deferred so a missing sibling module only blows up when that
     family is actually requested, not at orchestrator import time.
     """
     import importlib
 
-    module = importlib.import_module(f"short_king.features.{family}")
-    fn_name = f"{family}_panel"
+    if family not in _FAMILY_MODULE:
+        raise KeyError(
+            f"unknown feature family '{family}' (valid: {sorted(_FAMILY_MODULE)})"
+        )
+    mod_name, fn_name = _FAMILY_MODULE[family]
+    module = importlib.import_module(f"short_king.features.{mod_name}")
     if not hasattr(module, fn_name):
         raise AttributeError(
-            f"short_king.features.{family} does not expose {fn_name}(panel)"
+            f"short_king.features.{mod_name} does not expose {fn_name}(panel)"
         )
     return getattr(module, fn_name)
 
@@ -181,6 +213,23 @@ def build_feature_panel(
 
     tcol, dcol = _ticker_date_cols(panel)
     out = panel.sort_values([tcol, dcol]).reset_index(drop=True).copy()
+
+    # Feature modules drifted on naming at agent-write time: some use
+    # PascalCase keys (Ticker/Date/adjClose/mktCap), others use lowercase
+    # (symbol/date/close/marketCap). The clean panel emits the former; we add
+    # the lowercase aliases here so every module sees what it asks for. New
+    # *feature* columns added by the families are returned alongside.
+    _alias = {
+        "Date": "date",
+        "Symbol": "symbol",
+        "Ticker": "ticker",
+        "adjClose": "close",
+        "mktCap": "marketCap",
+    }
+    for src, dst in _alias.items():
+        if src in out.columns and dst not in out.columns:
+            out[dst] = out[src]
+
     n0_rows, n0_cols = out.shape
     logger.info(
         f"build_feature_panel: start | rows={n0_rows:,} cols={n0_cols} "

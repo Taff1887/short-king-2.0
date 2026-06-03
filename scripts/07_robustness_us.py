@@ -5,18 +5,34 @@ Intent
 Demonstrate the methodology travels by repeating the ASX exercise on a
 survivorship-bias-free S&P 500 panel:
 
-1. :func:`short_king.data.universe.build_sp500_pit` — point-in-time membership
-   over the same study window.
+1. :func:`short_king.data.universe.build_sp500_pit` — point-in-time S&P 500
+   membership over the same study window (Wikipedia/CRSP-style PIT, no
+   look-ahead from current index composition).
 2. :func:`short_king.data.fundamentals.fetch_many` + cached FMP fundamentals
-   for each in-universe symbol.
+   for each in-universe symbol (same FMP endpoints as the ASX path).
 3. :func:`short_king.data.prices.fetch_many_adjusted` for total-return prices.
 4. ``assemble_pit_panel`` / ``conservative_clean`` / ``build_feature_panel``
-   reused **with ``skip-short-features=True``** — the FMP stable API does not
-   expose a weekly US short-interest analogue. Quarterly FINRA short-interest
-   data exists but is intentionally **not** wired in here; documented in
-   ``docs/methodology.md`` as a known limitation of the US robustness check.
-5. Backtest the EW composite and the GBM ranker via ``backtest_weekly`` to
-   confirm the cross-sectional ranking machinery isn't ASX-specific.
+   reused **without the short-interest feature family**. The FMP stable API
+   does not expose a weekly US short-interest analogue; the US FINRA / NYSE
+   short-interest series is bi-monthly / quarterly, an order of magnitude
+   coarser than the weekly ASIC panel that drives the ASX signal. Mixing
+   cadences would either force weekly forward-fills that fabricate
+   information or force the whole US panel down to quarterly, which destroys
+   the cross-sectional ranking exercise. We therefore drop the short family
+   entirely on US and document this as a known limitation in
+   ``docs/methodology.md`` rather than fake a comparable signal.
+5. Re-target the model. On ASX the headline label is the
+   regression-style ``fwd_ret_4w``; on US we run the
+   :class:`short_king.models.baselines.GBM_cls` baseline against a *binary*
+   ``fwd_ret_4w`` target (sign of the 4-week forward return), so the
+   robustness exercise tests the cross-sectional ranking machinery rather
+   than parity of point predictions across markets.
+6. Compare factor loadings cross-market: line up the per-feature SHAP /
+   gain importances from the ASX GBM with the US GBM_cls and report the
+   rank correlation. A positive correlation is the headline robustness
+   finding — same features matter on a different market — and a negative or
+   zero correlation flags ASX-specific overfit. ``backtest_weekly`` is run
+   on the US predictions to sanity-check that the ranking actually trades.
 
 This script is presently a stub: the end-to-end wiring lives in the modules
 above but the integration test is deferred to the next iteration so the

@@ -69,7 +69,7 @@ def fetch_prices_adjusted(
     the right input for computing returns, momentum and realised volatility.
     """
     client = client or FMPClient()
-    rows = client.historical_prices(symbol, from_date=start, to_date=end, series="dividend-adjusted")
+    rows = client.historical_price_eod_adjusted(symbol)
     df = _to_frame(rows, price_col="adjClose", symbol=symbol)
     return _clip(df, start, end)
 
@@ -89,7 +89,7 @@ def fetch_prices_full(
     rebalance-date price.
     """
     client = client or FMPClient()
-    rows = client.historical_prices(symbol, from_date=start, to_date=end, series="full")
+    rows = client.historical_price_eod_full(symbol)
     df = _to_frame(rows, price_col="close", symbol=symbol)
     return _clip(df, start, end)
 
