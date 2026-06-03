@@ -350,11 +350,13 @@ def main() -> int:
 
     # --- Interpretability: full-sample GBM for SHAP / gain importance --------
     logger.info("interpret: fitting full-sample GBM classifier for SHAP / gain importance")
-    train_mask = y_bin.notna() & np.isfinite(df[feat_cols].to_numpy()).all(axis=1)
+    # Cast to plain float64 (same nullable-Float64 reason as the walk-forward loop).
+    _X_all = df[feat_cols].astype("float64", copy=False)
+    train_mask = y_bin.notna() & np.isfinite(_X_all.to_numpy()).all(axis=1)
     if int(train_mask.sum()) == 0:
         logger.warning("no usable rows for full-sample GBM; skipping interpret artefacts")
     else:
-        X_full = df.loc[train_mask, feat_cols]
+        X_full = _X_all.loc[train_mask]
         y_full = y_bin.loc[train_mask].astype(int)
         full_gbm = fit_gbm_classifier(X_full, y_full, feature_cols=feat_cols, cfg=gbm_cfg)
 
