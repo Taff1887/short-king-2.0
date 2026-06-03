@@ -156,9 +156,31 @@ commission + borrow + slippage. Full detail:
 | ![Monthly heatmap](charts/monthly_heatmap.png) | |
 | **Monthly returns** — best strategy. | |
 
-A SHAP feature-importance bar (`charts/shap_summary.png`) is produced by
-`scripts/05_train_and_validate.py` when SHAP succeeds; gain-based importance
-is in `reports/gain_importance.csv` (a useful sanity check on top features).
+### Model interpretability — what's the GBM picking up?
+
+Top SHAP features for the full-sample LightGBM classifier
+(higher mean-|SHAP| = stronger contribution to the score):
+
+| Rank | Feature | Mean &#124;SHAP&#124; | Family |
+|---:|---|---:|---|
+| 1 | `mom_4w_rk` | 0.109 | momentum |
+| 2 | `asset_growth_yoy_rk` | 0.098 | growth (textbook short signal) |
+| 3 | `drawdown_52w_rk` | 0.093 | price / risk |
+| 4 | `balance_sheet_preferredStock_rk` | 0.092 | leverage / dilution |
+| 5 | `mom_1w_rk` | 0.089 | short-term reversal |
+| 6 | `mom_12w_skip1_rk` | 0.087 | momentum (skip-1w) |
+| 7 | `mom_12w_rk` | 0.078 | momentum |
+| 8 | `cash_flow_accountsPayables_rk` | 0.070 | working capital |
+| 9 | `mom_26w_rk` | 0.065 | medium-term momentum |
+| 10 | `cash_flow_incomeTaxesPaid_rk` | 0.061 | quality |
+
+![SHAP feature importance — LightGBM classifier](charts/shap_summary.png)
+
+The economic read is reassuring: the tree model picks up known short-side
+factors (asset growth, drawdown, preferred-stock issuance, working-capital
+stress) alongside multi-horizon momentum — none of it surprising for a
+quant short signal. Full ranked lists in `reports/gain_importance.csv` and
+`reports/mean_abs_shap.csv`.
 
 ---
 
