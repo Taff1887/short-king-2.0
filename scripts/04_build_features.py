@@ -1,12 +1,12 @@
 """Assemble the PIT panel, clean it, then build the feature matrix.
 
 Three-stage pipeline:
-
 1. ``assemble_pit_panel`` joins the ASIC weekly short panel with FMP
    fundamentals (lagged to their ``filingDate``) and adjusted prices on a
    common Friday grid -> ``data/processed/master_pit.parquet``.
-2. ``conservative_clean`` drops illiquid / corrupted series, then a strict
-   ``check_no_lookahead`` audit runs -> ``data/processed/master_clean.parquet``.
+2. ``conservative_clean`` nulls out demonstrably bad (symbol, week) cells
+   (e.g. unadjusted splits with abs-weekly-return > 150 %) and refreshes
+   ``investable`` -> ``data/processed/master_clean.parquet``.
 3. ``build_feature_panel`` stitches the per-family feature modules + adds
    cross-sectional ranks and sector dummies -> ``data/processed/features.parquet``.
 
@@ -36,35 +36,30 @@ from short_king.utils.io import read_parquet
 from short_king.utils.logging import logger
 
 
+# Map between PascalCase keys emitted by assemble and the lowercase keys
+# the clean module operates on. We bridge at the script layer so the two
+# modules stay simple and locally-consistent.
+_TO_CLEAN = {"Date": "date", "Symbol": "symbol"}
+_FROM_CLEAN = {v: k for k, v in _TO_CLEAN.items()}
+
+
 def _parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(description=__doc__)
-    p.add_argument(
-        "--min-mcap",
-        type=float,
-        default=2e8,
-        help="Min market cap filter passed to conservative_clean (default A$200m).",
-    )
-    p.add_argument(
-        "--no-sector-dummies",
-        action="store_true",
-        help="Skip one-hot sector dummies (saves columns for linear baselines).",
-    )
-    p.add_argument(
-        "--no-cross-sectional",
-        action="store_true",
-        help="Skip within-date percentile ranking (debugging only).",
-    )
-    p.add_argument(
-        "--allow-lookahead",
-        action="store_true",
-        help="Do not abort on lookahead-check failures (debugging only).",
-    )
+    p.add_argument("--no-sector-dummies", action="store_true",
+                   help="Skip one-hot sector dummies (saves columns for linear baselines).")
+    p.add_argument("--no-cross-sectional", action="store_true",
+                   help="Skip within-date percentile ranking (debugging only).")
+    p.add_argument("--allow-lookahead", action="store_true",
+                   help="Do not abort on lookahead-check failures (debugging only).")
+    p.add_argument("--corrupt-threshold", type=float, default=1.5,
+                   help="Abs weekly-return threshold above which a (symbol, week) "
+                        "cell is treated as corrupted (default 1.5 = 150 %).")
     return p.parse_args()
 
 
-def _require(path):
+def _require(path) -> bool:
     if not path.exists():
-        logger.error(f"{path} not found — required input is missing.")
+        logger.error(f"{path} not found - required input is missing.")
         return False
     return True
 
@@ -83,7 +78,7 @@ def main() -> int:
         logger.error("must run 03_pull_fmp_prices.py first")
         return 1
     if not fmp_raw_dir.exists() or not any(fmp_raw_dir.glob("*.parquet")):
-        logger.error(f"{fmp_raw_dir} empty — must run 02_pull_fmp_fundamentals.py first")
+        logger.error(f"{fmp_raw_dir} empty - must run 02_pull_fmp_fundamentals.py first")
         return 1
 
     t0 = dt.datetime.now()
@@ -91,43 +86,47 @@ def main() -> int:
 
     asic = read_parquet(asic_path)
     prices = read_parquet(prices_path)
-    fmp_tables = {
-        p.stem: read_parquet(p) for p in sorted(fmp_raw_dir.glob("*.parquet"))
-    }
+    fmp_tables = {p.stem: read_parquet(p) for p in sorted(fmp_raw_dir.glob("*.parquet"))}
+    # Make sure all 7 canonical endpoints are keyed even if any were empty / missing.
+    from short_king.data.fundamentals import STATEMENT_ENDPOINTS
+    import pandas as _pd
+    for ep in STATEMENT_ENDPOINTS:
+        fmp_tables.setdefault(ep, _pd.DataFrame())
     logger.info(
         f"inputs: asic_long={len(asic):,} rows | prices_long={len(prices):,} rows "
         f"| fmp_raw endpoints={list(fmp_tables)}"
     )
 
     # 1) Assemble the PIT panel.
-    panel = assemble_pit_panel(asic=asic, fmp_tables=fmp_tables, prices=prices)
+    panel = assemble_pit_panel(
+        asic_long=asic,
+        fundamentals=fmp_tables,
+        prices_long=prices,
+    )
     write_panel(panel, settings.processed_dir / "master_pit.parquet")
-    summary = panel_quality_summary(panel)
-    logger.info(f"panel_quality_summary:\n{summary}")
+    logger.info(f"panel_quality_summary:\n{panel_quality_summary(panel)}")
 
-    # 2) Clean + audit for look-ahead bias.
-    corrupted = detect_corrupted_series(panel)
-    if corrupted is not None and len(corrupted):
-        logger.warning(f"detect_corrupted_series flagged {len(corrupted)} series")
-    clean = conservative_clean(panel, min_mcap=args.min_mcap)
+    # 2) Conservative clean. The clean module operates on lowercase keys
+    #    (date, symbol, adjClose) - bridge in/out at the script layer.
+    panel_lc = panel.rename(columns=_TO_CLEAN)
+    suspects = detect_corrupted_series(panel_lc, max_abs_weekly_return=args.corrupt_threshold)
+    clean_lc = conservative_clean(panel_lc, suspects)
+
+    # Look-ahead audit on the lowercase frame (clean filled filing_lag_days).
+    lookahead = check_no_lookahead(clean_lc)
+    if lookahead["n_violations"] > 0 and not args.allow_lookahead:
+        logger.error(f"check_no_lookahead FAILED: {lookahead}")
+        return 2
+    logger.info(f"check_no_lookahead passed: {lookahead}")
+
+    # Side-by-side coverage report (raw vs clean).
+    logger.info(f"quality_report:\n{quality_report(panel_lc, clean_lc)}")
+
+    # Bridge back to PascalCase for downstream features/models/backtest.
+    clean = clean_lc.rename(columns=_FROM_CLEAN)
     write_clean(clean, settings.processed_dir / "master_clean.parquet")
-    logger.info(f"quality_report (clean):\n{quality_report(clean)}")
 
-    leak = check_no_lookahead(clean)
-    if leak is not None:
-        # Allow a (bool, msg/df) or a non-empty DataFrame to signal a violation.
-        violated = (
-            (isinstance(leak, tuple) and not bool(leak[0]))
-            or (hasattr(leak, "empty") and not leak.empty)
-        )
-        if violated:
-            logger.error(f"check_no_lookahead FAILED: {leak}")
-            if not args.allow_lookahead:
-                return 2
-        else:
-            logger.info(f"check_no_lookahead passed: {leak}")
-
-    # 3) Build the feature matrix.
+    # 3) Feature matrix.
     features = build_feature_panel(
         clean,
         cross_sectional=not args.no_cross_sectional,
