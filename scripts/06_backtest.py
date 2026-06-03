@@ -33,13 +33,19 @@ _FWD_RET_COL = "fwd_ret_4w"
 
 def _parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(description=__doc__)
-    p.add_argument("--n-deciles", type=int, default=10, help="Number of deciles.")
+    p.add_argument("--n-buckets", type=int, default=5,
+                   help="Number of fractile buckets. 5 = quintiles (default), 10 = deciles.")
     p.add_argument("--bps-round-trip", type=float, default=25.0,
                    help="Per-side commission + half-spread, bps.")
     p.add_argument("--annual-borrow-pct", type=float, default=1.5,
                    help="Annualised borrow fee on short positions, %% p.a.")
     p.add_argument("--slippage-bps", type=float, default=5.0,
                    help="One-sided slippage on weight changes, bps.")
+    p.add_argument("--stop-loss-pct", type=float, default=0.15,
+                   help="Per-position hard-stop floor (fraction of position notional). "
+                        "0.15 = clip any position whose weekly P&L would be worse than "
+                        "-15%% of its own notional. Each stop incurs an extra round-trip "
+                        "commission. Set to 1.0 to disable.")
     return p.parse_args()
 
 
@@ -77,6 +83,9 @@ def _summary_row(model: str, strategy: str, result) -> dict:
         "hit_rate": float(s.get("hit_rate", float("nan"))),
         "avg_turnover": float(s.get("avg_turnover", float("nan"))),
         "n_rebalances": int(s.get("n_weeks", 0)),
+        "n_stops_total": int(s.get("n_stops_total", 0)),
+        "stop_loss_savings_total": float(s.get("stop_loss_savings_total", 0.0)),
+        "stop_commission_total": float(s.get("stop_commission_total", 0.0)),
     }
 
 
@@ -122,12 +131,19 @@ def main() -> int:
         bps_round_trip=args.bps_round_trip,
         annual_borrow_pct=args.annual_borrow_pct,
         slippage_bps=args.slippage_bps,
+        stop_loss_pct=args.stop_loss_pct if args.stop_loss_pct < 1.0 else None,
     )
 
+    # Strategy labels follow the bucket count: 5 -> quintile, 10 -> decile,
+    # everything else -> "bucketN" so the report stays self-describing.
+    n = int(args.n_buckets)
+    fractile = "quintile" if n == 5 else "decile" if n == 10 else f"bucket{n}"
     strategies = {
-        "decile_short": lambda g: decile_short(g, n_deciles=args.n_deciles),
-        "long_short_decile": lambda g: long_short_decile(g, n_deciles=args.n_deciles),
+        f"{fractile}_short":        lambda g, _n=n: decile_short(g, n_deciles=_n),
+        f"long_short_{fractile}":   lambda g, _n=n: long_short_decile(g, n_deciles=_n),
     }
+    logger.info(f"strategies={list(strategies)} | stop_loss_pct={cost.stop_loss_pct} | "
+                f"bps_round_trip={cost.bps_round_trip} | borrow={cost.annual_borrow_pct}%")
 
     summary_rows: list[dict] = []
     returns_panel: dict[str, pd.Series] = {}

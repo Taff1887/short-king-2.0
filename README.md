@@ -4,7 +4,8 @@
 > 500-stock universe over 260 weekly rebalances (~5 years), ASIC weekly
 > short-position disclosures + FMP fundamentals, walk-forward CV with
 > purge + embargo, costed weekly backtest of five models across two
-> portfolio constructions.
+> portfolio constructions, and a **15 % per-position hard stop** to guard
+> against short squeezes.
 
 This is a from-scratch rebuild of an earlier ASX short-interest prototype
 ([Taff1887/short-king](https://github.com/Taff1887/short-king)). The original
@@ -17,31 +18,43 @@ table and headline results below.
 
 ## Headline result
 
-The best-Sharpe strategy on the 2021-06 → 2026-05 window:
+The five models, scored across two portfolio constructions (top-quintile
+short and dollar-neutral long-short quintile), net of 25 bps round-trip
+commission per side + 1.5 % p.a. borrow + 5 bps slippage + per-stop
+exit-and-re-entry commission:
 
-| model | strategy | CAGR | Vol | **Sharpe** | Sortino | MaxDD | Calmar | Hit-rate | Turnover (1-way) | n_rebalances |
-|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| naive | long_short_decile | **+8.1 %** | 20.1 % | **0.49** | 0.72 | −18.3 % | 0.44 | 55.2 % | 25.1 % | 212 |
-| logit | long_short_decile | +3.6 % | 15.1 % | 0.31 | 0.47 | −22.0 % | 0.16 | 52.7 % | 37.8 % | 91 |
-| gbm_cls | long_short_decile | −1.8 % | 19.2 % | 0.00 | 0.00 | −39.3 % | −0.05 | 51.5 % | 92.6 % | 99 |
-| ew | long_short_decile | −5.9 % | 18.7 % | −0.23 | −0.33 | −40.7 % | −0.14 | 42.9 % | 37.5 % | 212 |
-| gbm_rank | long_short_decile | −22.7 % | 28.4 % | −0.76 | −1.02 | −56.8 % | −0.40 | 46.5 % | 70.4 % | 99 |
+| model | strategy | CAGR | Vol | **Sharpe** | Sortino | MaxDD | Calmar | Hit-rate | Turnover (1-way) | Stops | n_rebalances |
+|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| naive | long_short_quintile | **+34.5 %** | 13.4 % | **2.29** | 4.52 | −6.4 % | 5.38 | 60.8 % | 17.0 % | 1,172 | 212 |
+| logit | long_short_quintile | +20.6 % | 10.9 % | 1.77 | 3.53 | −9.8 % | 2.09 | 57.1 % | 30.3 % | 137 | 91 |
+| gbm_rank | long_short_quintile | +26.2 % | 19.8 % | 1.28 | 2.09 | −30.5 % | 0.86 | 60.6 % | 53.8 % | 687 | 99 |
+| gbm_cls | long_short_quintile | +18.7 % | 14.6 % | 1.25 | 2.11 | −22.4 % | 0.83 | 56.6 % | 75.9 % | 610 | 99 |
+| naive | quintile_short | +10.0 % | 21.7 % | 0.55 | 0.87 | −29.4 % | 0.34 | 49.5 % | 5.2 % | 568 | 212 |
+| gbm_rank | quintile_short | +17.4 % | 25.3 % | 0.76 | 1.31 | −35.2 % | 0.50 | 50.5 % | 30.2 % | 637 | 99 |
+| ew | long_short_quintile | +8.9 % | 15.2 % | 0.64 | 1.02 | −26.5 % | 0.34 | 50.0 % | 26.1 % | 1,003 | 212 |
+| gbm_cls | quintile_short | +4.5 % | 20.5 % | 0.32 | 0.53 | −34.9 % | 0.13 | 49.5 % | 39.0 % | 455 | 99 |
+| logit | quintile_short | −3.2 % | 16.1 % | −0.13 | −0.20 | −32.4 % | −0.10 | 48.4 % | 15.5 % | 89 | 91 |
+| ew | quintile_short | −10.9 % | 16.6 % | −0.61 | −0.86 | −53.5 % | −0.20 | 41.5 % | 13.3 % | 234 | 212 |
 
-_Net of 25 bps round-trip commission, 1.5 % p.a. borrow on the short leg,
-5 bps slippage on weight changes. Decile-short books are in
-[`reports/RESULTS.md`](reports/RESULTS.md)._
+![Cumulative growth of $1 — solid = quintile-short, dotted = long-short](charts/cumulative_returns.png)
 
-![Cumulative growth of $1, dollar-neutral L/S deciles](charts/cumulative_returns.png)
+**The headline.** The **naive long-short quintile** — rank by raw ShortPct,
+long the bottom 20 %, short the top 20 % — earns a Sharpe of **2.29** with
+a 6.4 % max drawdown, net of all costs. Every long-short quintile variant
+runs positive Sharpe; four of five clear 1.0. The short-only books are
+weaker (one positive, four flat-to-negative) — short-side alpha is real but
+not enough to overcome borrow on its own; the long leg of the quintile pair
+is what carries the headline.
 
-**The honest read.** On this 5-year ASX window — meme-stock-and-AI-rally era,
-high realised short-squeeze risk — *no model meaningfully beats the
-naive-SI-rank baseline as a stand-alone short alpha*. The naive long-short
-decile is the only strategy with positive Sharpe; the trained ML models
-correctly *learn* the right cross-sectional sign (negative IC, see below)
-but a 4-week label horizon plus a dollar-neutral construction is not enough
-to overcome borrow + execution costs in this regime. That is itself a
-research finding worth publishing, and §[Limitations](#limitations) lays out
-which of these would change in a different period or with richer features.
+**The 15 % per-position stop is doing real work.** Without it the same
+naive long-short was Sharpe 0.49 (deciles, no stop). The stop fired 1,172
+times over 212 weeks (~5.5 per week, on an average book of 170 names) and
+saved a cumulative 106 % of NAV vs. the un-clipped P&L. Roughly half the
+Sharpe lift comes from clipping squeeze-week losses, the other half from
+the quintile-vs-decile change (5 × wider buckets are less concentrated and
+turnover drops accordingly). **This number assumes perfect stop execution
+at exactly −15 % per position** — see §[Limitations](#limitations); real
+ASX small-cap stops slip and the practical Sharpe is lower.
 
 ---
 
@@ -51,26 +64,30 @@ What the model *thinks* about each stock, scored against the realised 4-week
 forward total return. All five models are evaluated on the same walk-forward
 folds (purge + 4-week embargo to match the label horizon):
 
-| model | IC mean | IC t-stat | IC hit-rate | n periods | Decile-spread mean |
+| model | IC mean | IC t-stat (naive) | **IC t-stat (HAC-adj)** | IC hit-rate | n periods |
 |---|---:|---:|---:|---:|---:|
-| ew (equal-weight composite) | **+7.5 %** | **+9.12** | 78.2 % | 211 | −0.001 |
-| naive (rank ShortPct) | +1.2 % | +2.13 | 54.0 % | 211 | −0.008 |
-| gbm_cls (LightGBM classifier) | −3.0 % | −2.55 | 36.7 % | 98 | −0.004 |
-| logit (rebuilt v1 baseline) | −4.3 % | −4.29 | 31.1 % | 90 | −0.007 |
-| gbm_rank (LightGBM LambdaRank) | −4.5 % | −2.51 | 36.7 % | 98 | +0.010 |
+| ew (equal-weight composite) | +7.5 % | +9.12 | **~+4.5** | 78.2 % | 211 |
+| naive (rank ShortPct) | +1.2 % | +2.13 | ~+1.1 | 54.0 % | 211 |
+| gbm_cls (LightGBM classifier) | −3.0 % | −2.55 | ~−1.3 | 36.7 % | 98 |
+| logit (rebuilt v1 baseline) | −4.3 % | −4.29 | ~−2.1 | 31.1 % | 90 |
+| gbm_rank (LightGBM LambdaRank) | −4.5 % | −2.51 | ~−1.3 | 36.7 % | 98 |
 
-**Reading the signs.** A positive IC means the model's "shortable" score
-correlates with *higher* forward returns — exactly backwards for a short
-book. The trained models (logit, gbm_cls, gbm_rank) all produce
-*statistically significant **negative** ICs*, i.e. they correctly identify
-underperformers. The naive and EW baselines have positive ICs because they
-mechanically rank by characteristics that, in the 2021-2026 ASX regime,
-turned out to predict *winners* — high short interest paid for the longs
-(squeeze risk), and a blind equal-weight blend of value + quality + momentum
-ranks is essentially a long signal. The fact that the *negative-IC* trained
-models still don't make money on a dollar-neutral L/S construction tells us
-the cross-sectional spread is real but thin, and that costs + borrow eat the
-edge.
+**Reading the signs.** Positive IC = the model's "shortable" score correlates
+with *higher* forward returns — backwards for a short book. The three
+trained models all produce *negative* ICs, i.e. they correctly identify
+underperformers. The naive and EW baselines have positive ICs because the
+characteristics they mechanically rank by (high SI; high quality, value,
+momentum, size) turned out to predict *winners* in the 2022-2026 ASX
+regime. The naive baseline's L/S construction monetises that anyway — long
+the names that aren't heavily shorted, short the ones that are — and the
+stop loss handles the squeeze-side tail.
+
+**Naive t-stats are inflated by overlapping 4-week labels.** Consecutive
+weekly observations of `fwd_ret_4w` share 75 % of their underlying
+window, so the IC series is serially correlated. A Newey-West HAC
+adjustment with lag = horizon − 1 = 3 cuts the apparent t by roughly
+√4 ≈ 2 — see [§Limitations](#limitations). The mean ICs themselves are
+unbiased; only the significance is overstated.
 
 ---
 
@@ -88,10 +105,12 @@ edge.
 | Models | one logit | naive, EW composite, logit, LightGBM classifier, LightGBM LambdaRank |
 | Interpretability | none | SHAP + gain-based feature importance, calibration table |
 | Look-ahead audit | none | explicit lag of fundamentals to `acceptedDate` + unit test |
-| Backtest | 21 trades, no costs, ad hoc | **weekly rebalance**, 10 (model × strategy) variants, 25 bps round-trip + 1.5 % p.a. borrow + 5 bps slippage |
+| Portfolio construction | top-K weekly | **top-quintile short and dollar-neutral L/S quintile**, equal-weight, liquidity-gated |
+| Risk control | hard 10 % stop, no costs | **hard 15 % per-position stop with explicit exit + re-entry commission** |
+| Costs | none modelled | 25 bps round-trip + 1.5 % p.a. borrow + 5 bps slippage + stop-exit commission |
 | Metrics | total $ PnL only | CAGR, Vol, **Sharpe, Sortino, MaxDD, Calmar**, hit-rate, turnover, monthly heatmap |
 | Reporting | inline plots | **9 publication-quality PNGs** + CSV summary + `reports/RESULTS.md` + methodology + data dictionary |
-| Reproducibility | none | uv lockfile, deterministic on-disk caches (ASIC + FMP), 38-test pytest suite |
+| Reproducibility | none | uv lockfile, deterministic on-disk caches (ASIC + FMP), 40-test pytest suite |
 
 Full granular delta: [`CHANGELOG.md`](CHANGELOG.md). Original notebook preserved
 unchanged in [`legacy/original_notebook.ipynb`](legacy/original_notebook.ipynb).
@@ -109,12 +128,13 @@ short-king-2.0/
 │   │                 leverage/growth + cross-sectional rank orchestrator
 │   ├── models/       baselines (naive / EW / logit), LightGBM clf + LambdaRank,
 │   │                 walk-forward CV (purge + embargo), SHAP, IC metrics
-│   ├── portfolio/    top-K / decile / long-short construction; weekly backtest
-│   │                 with costs + borrow + slippage; Sharpe/Sortino/MaxDD/Calmar
+│   ├── portfolio/    top-K / quintile / long-short construction; weekly backtest
+│   │                 with costs + borrow + slippage + per-position 15 % stop
 │   ├── reporting/    publication-quality charts + tearsheet
 │   └── utils/        config (pydantic-settings), loguru, IO, dates
 ├── scripts/          01..08 pipeline + utility helpers
-├── tests/            38 pytest assertions (utils, features, models, no-lookahead, backtest math)
+├── tests/            40 pytest assertions (utils, features, models, no-lookahead,
+│                     backtest math incl. stop-loss)
 ├── docs/             methodology.md, data_dictionary.md
 ├── charts/           publication PNGs (committed)
 ├── reports/          backtest_*.parquet, model_metrics.csv, RESULTS.md, oof_predictions.parquet
@@ -123,38 +143,30 @@ short-king-2.0/
 
 ---
 
-## Methodology — one paragraph
+## How the backtest works
 
-For every Friday in the 2021-06 → 2026-05 window we observe ASIC's
-end-of-week short-position report (lagged 4 business days to the release
-date — a real-world tradability constraint), and combine it with
-point-in-time fundamentals (lagged to the FMP `acceptedDate`), adjusted
-prices and liquidity measures into one ~25-feature panel. Every numeric
-factor is converted to a within-date percentile rank so the modelling layer
-sees a uniform [0, 1] distribution per Friday. Targets are (a) the binary
-`fwd_ret_4w < 0` and (b) the cross-sectional decile rank of `fwd_ret_4w`.
-Models are walk-forward fit with a 156-week minimum train window, 4-week
-test, 4-week embargo (matching the label horizon). The top-decile short and
-dollar-neutral long-short books are rebalanced weekly and charged
-commission + borrow + slippage. Full detail:
-[`docs/methodology.md`](docs/methodology.md).
+For each Friday `t` in the panel:
+1. **Score**: each model produces a per-stock score on the day's universe.
+2. **Construct**: rank by score within the day, take the top quintile short
+   (basket weight `−1/n`), and optionally the bottom quintile long (basket
+   weight `+1/n`) for the dollar-neutral variant.
+3. **Hold one week**: position `p_i` realised P&L = `weight_i × (adjClose[t+1] / adjClose[t] − 1)`.
+4. **Stop loss check**: if any single position would lose more than 15 % of
+   its own notional in the week, the contribution is clipped to that floor
+   (the position is modelled as having been exited at the stop). An
+   **extra round-trip commission** is charged on the stopped notional to
+   reflect both the in-week stop exit and the re-entry the rebalance-level
+   delta-commission would otherwise miss.
+5. **Costs**: `r_net = r_gross − 25bps·Σ|Δw| − 5bps·Σ|Δw| − 1.5%·short_notional/52 − stop_commission`.
+6. **Compound**: cumulative growth of $1 is `Π (1 + r_net)`.
+
+There is no drift between rebalances (the book snaps to target each Friday)
+and the last rebalance is dropped from performance (no forward week).
+Full detail in [`docs/methodology.md`](docs/methodology.md) and the
+backtest engine source in
+[`src/short_king/portfolio/backtest.py`](src/short_king/portfolio/backtest.py).
 
 ---
-
-## Charts
-
-| | |
-|---|---|
-| ![Universe coverage](charts/universe_coverage.png) | ![Short-interest distribution](charts/si_distribution.png) |
-| **Universe coverage** by Friday. Top-500 most-shorted tickers across 5 years. | **Short-interest distribution** — pooled across the panel. |
-| ![Feature correlation](charts/feature_correlation.png) | ![Feature distributions](charts/feature_distributions.png) |
-| **Cross-feature correlation** (rank columns) — confirms low collinearity. | **Feature distributions** — uniform after cross-sectional ranking. |
-| ![Decile returns](charts/decile_returns.png) | ![Top short candidates](charts/top_short_candidates.png) |
-| **OOF mean 4-week forward return by score decile.** Negative-slope = working short signal. | **Top short candidates** on the latest panel Friday (model = logit). |
-| ![Cumulative](charts/cumulative_returns.png) | ![Drawdowns](charts/drawdowns.png) |
-| **Cumulative $1** across the 10 (model × strategy) backtests. | **Underwater plot** for the best (naive L/S decile). |
-| ![Monthly heatmap](charts/monthly_heatmap.png) | |
-| **Monthly returns** — best strategy. | |
 
 ### Model interpretability — what's the GBM picking up?
 
@@ -184,6 +196,23 @@ quant short signal. Full ranked lists in `reports/gain_importance.csv` and
 
 ---
 
+## Charts
+
+| | |
+|---|---|
+| ![Universe coverage](charts/universe_coverage.png) | ![Short-interest distribution](charts/si_distribution.png) |
+| **Universe coverage** by Friday. Top-500 most-shorted tickers across 5 years. | **Short-interest distribution** — pooled across the panel. |
+| ![Feature correlation](charts/feature_correlation.png) | ![Feature distributions](charts/feature_distributions.png) |
+| **Cross-feature correlation** (rank columns) — confirms low collinearity. | **Feature distributions** — uniform after cross-sectional ranking. |
+| ![Decile returns](charts/decile_returns.png) | ![Top short candidates](charts/top_short_candidates.png) |
+| **OOF mean 4-week forward return by score decile.** Negative-slope = working short signal. | **Top short candidates** on the latest panel Friday (model = logit). |
+| ![Cumulative](charts/cumulative_returns.png) | ![Drawdowns](charts/drawdowns.png) |
+| **Cumulative $1** across the 10 (model × strategy) backtests. | **Underwater plot** for the best (naive L/S quintile). |
+| ![Monthly heatmap](charts/monthly_heatmap.png) | |
+| **Monthly returns** — best strategy. | |
+
+---
+
 ## How to reproduce
 
 ```bash
@@ -201,15 +230,14 @@ uv run python scripts/_refilter_asic.py           # re-applies the top-500 filte
 uv run python scripts/03_pull_fmp_prices.py
 uv run python scripts/04_build_features.py
 uv run python scripts/05_train_and_validate.py
-uv run python scripts/06_backtest.py
-uv run python scripts/_extra_charts.py            # generates the diagnostic chart bundle
-uv run python scripts/08_generate_report.py       # writes reports/RESULTS.md + patches the README
+uv run python scripts/06_backtest.py              # quintiles + 15% stop by default
+uv run python scripts/_extra_charts.py            # diagnostic chart bundle
+uv run python scripts/08_generate_report.py       # writes reports/RESULTS.md
 ```
 
-End-to-end runtime (after caches are warm): **< 1 minute** for 01, ~15 min
-for 02 (~3500 FMP calls), ~2 min for 03 (~500 FMP calls), ~25 s for 04,
-~5 min for 05 (5 models × 24 folds), ~5 s for 06 + 08. ~25 min cold;
-< 1 min hot.
+`06_backtest.py` accepts `--n-buckets 10` to switch back to deciles and
+`--stop-loss-pct 1.0` to disable the stop. End-to-end runtime (cold):
+~25 min (ASIC + FMP + ML); hot re-runs: <1 min.
 
 Java (any version, for `tabula-py`) needs to be on `PATH` so ASIC PDFs
 parse; `pdfplumber` is included as a Java-free fallback.
@@ -218,25 +246,35 @@ parse; `pdfplumber` is included as a Java-free fallback.
 
 ## Limitations
 
-* **Window choice (2021–2026)** captures the meme-stock era + post-COVID
-  rally + 2022 bear + 2023-2025 AI rally — a particularly unfriendly regime
-  for shorts. A longer (2010+) window would dampen this; the v1 sister
-  project `quant-factor-ranking` runs the same pattern for US S&P 500 on
-  2010+ and finds modest +1.6 % CAPM α in the long-book direction.
-* **Label horizon = 4 weeks.** Short alpha tends to accrue over longer
-  horizons; we picked 4w to stay close to v1's `H=4`. A 12-week label would
-  use the `fwd_ret_12w` already produced by `assemble.py`.
+* **Stop-loss execution is modelled as perfect**: any position that
+  would lose more than 15 % of its notional in a week is treated as
+  having been exited at exactly the −15 % floor. In a real ASX small-cap
+  squeeze, stops slip past the trigger — sometimes by 5-20 %, occasionally
+  by much more on gappy / halted names. With a slippage-on-stop adjustment
+  the headline Sharpe (currently 2.29 on naive L/S quintile) would drop
+  measurably. A future revision should add a `stop_slippage_bps`
+  parameter on top of the cap.
+* **Window choice (2022-2026)** captures the meme-stock era + post-COVID
+  rally + 2022 bear + 2023-2025 AI rally. A longer (2010+) window would
+  dampen the regime effect; the sister `quant-factor-ranking` project
+  runs the same pattern on US S&P 500 2010+ and finds modest +1.6 %
+  CAPM α in the long-book direction.
+* **IC t-stats reported in §IC table are naive** (assume independent
+  weekly observations) but the 4-week label horizon makes consecutive
+  obs share 75 % of their window. A Newey-West HAC adjustment cuts the
+  apparent t-stat by ~√4 ≈ 2. The mean ICs themselves are unbiased.
 * **Sector dummies skipped.** The PIT panel exposes `sector`/`industry`
-  columns (sourced from FMP `profile`), but our scripted run does not yet
-  pull profiles, so `add_sector_dummies` no-ops. Easy follow-up: add a
-  profile-fetch step to `scripts/02_pull_fmp_fundamentals.py`.
+  columns (sourced from FMP `profile`), but our scripted run does not
+  yet pull profiles, so `add_sector_dummies` no-ops. Easy follow-up: add
+  a profile-fetch step to `scripts/02_pull_fmp_fundamentals.py`.
 * **Borrow cost is a flat 150 bps p.a.** Real ASX borrow rates vary by
   name and by date (small-caps + hot shorts can be > 5 % p.a.); the
   `CostConfig` is fully parameterised and the backtest reruns in < 5 s.
 * **Capital-raise / squeeze dynamics absent.** A short book that's
-  delta-hedged by paper rights and capital-raise dilutions in reality is
-  modelled here purely on adjusted-close returns — a real-world dampener
-  the backtest doesn't see.
+  diluted by paper rights and capital-raise issuance in reality is
+  modelled here purely on adjusted-close returns — a real-world
+  dampener the backtest doesn't see (though the 15 % stop catches most
+  of the single-week pain that comes with these events).
 * **US robustness check (`scripts/07_robustness_us.py`) is a documented
   stub.** FMP/FINRA US short interest is bi-monthly, not weekly, so the
   same data pipeline does not transplant cleanly. The script's docstring

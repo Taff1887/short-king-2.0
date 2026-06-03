@@ -66,12 +66,23 @@ class CostConfig:
         If True, also apply ``annual_borrow_pct`` to the long book (some
         prime-broker structures charge a leverage/financing fee on the
         long leg). Default False - shorts only.
+    stop_loss_pct:
+        Per-position hard stop. Any position whose realised weekly P&L is
+        worse than ``-stop_loss_pct * |weight|`` is clipped to that floor
+        (i.e. the position is treated as having been exited at the stop
+        price). Each stop trigger also incurs an extra round-trip
+        commission to model the in-week exit *and* the re-entry that the
+        rebalance-level delta-commission would otherwise miss. Set to
+        ``None`` (or ``>= 1.0``) to disable. Default 0.15 reflects the v1
+        notebook's hard-stop convention and is the standard short-squeeze
+        guard for ASX small/mid-caps.
     """
 
     bps_round_trip: float = 25.0
     annual_borrow_pct: float = 1.5
     slippage_bps: float = 5.0
     bench_borrow_for_longs: bool = False
+    stop_loss_pct: float | None = 0.15
 
 
 @dataclass
@@ -341,9 +352,27 @@ def backtest_weekly(
     w_held = w_wide.loc[held_dates]
     r_held = stock_rets.reindex(index=held_dates, columns=w_held.columns).fillna(0.0)
 
-    # Gross position return: long position earns the stock return, short
-    # position earns -stock_return. Encoded by signed weight already.
-    gross_per_week = (w_held * r_held).sum(axis=1)
+    # Raw per-position weekly P&L contribution: long position earns the stock
+    # return, short position earns -stock_return. Encoded by signed weight.
+    contrib_raw = w_held * r_held
+    gross_pre_stop = contrib_raw.sum(axis=1)
+
+    # ---- Per-position hard stop ----------------------------------------------
+    # If a single position would lose more than ``stop_loss_pct`` of its own
+    # notional in the week, clip it to that floor. For a short with weight
+    # -0.05 and a 15 % stop, that caps the contribution at -0.0075 of book
+    # (= -15 % of the position's notional).
+    stop_pct = cfg.stop_loss_pct
+    if stop_pct is not None and stop_pct < 1.0:
+        floor = -float(stop_pct) * w_held.abs()
+        stopped = contrib_raw < floor
+        contrib_capped = contrib_raw.where(~stopped, floor)
+    else:
+        stopped = pd.DataFrame(False, index=contrib_raw.index, columns=contrib_raw.columns)
+        contrib_capped = contrib_raw
+    gross_per_week = contrib_capped.sum(axis=1)
+    n_stops = stopped.sum(axis=1).astype(int)
+    stop_loss_savings = (gross_per_week - gross_pre_stop)  # >= 0 (clipping helps)
 
     # Old weight = the previous *target* (no drift). For the first held week
     # the old weight is zero (book starts flat).
@@ -363,6 +392,12 @@ def backtest_weekly(
     commission = two_way_traded * cfg.bps_round_trip / 10_000.0
     slippage = two_way_traded * cfg.slippage_bps / 10_000.0
 
+    # Stop-loss exit cost: each stop fires an in-week close trade AND the
+    # rebalance delta-commission would otherwise miss the implied re-entry,
+    # so we charge BOTH sides (2x ``bps_round_trip``) on the stopped notional.
+    stopped_notional = (stopped.astype(float) * w_held.abs()).sum(axis=1)
+    stop_commission = stopped_notional * 2.0 * cfg.bps_round_trip / 10_000.0
+
     # Borrow cost on *short* positions. Charged on the average weight held
     # during the period (here equal to ``new_w`` because no drift). Per-week
     # rate = annual / 52.
@@ -373,7 +408,7 @@ def backtest_weekly(
     if cfg.bench_borrow_for_longs:
         borrow = borrow + long_notional * borrow_rate_wk
 
-    cost_total = commission + slippage + borrow
+    cost_total = commission + slippage + borrow + stop_commission
     net_per_week = gross_per_week - cost_total
 
     n_positions = (new_w.abs() > 1e-12).sum(axis=1).astype(int)
@@ -382,13 +417,17 @@ def backtest_weekly(
         {
             "Date": held_dates,
             "ret_gross": gross_per_week.to_numpy(),
+            "ret_gross_pre_stop": gross_pre_stop.to_numpy(),
+            "stop_loss_savings": stop_loss_savings.to_numpy(),
             "ret_net": net_per_week.to_numpy(),
             "turnover": turnover.to_numpy(),
             "cost_total": cost_total.to_numpy(),
             "borrow": borrow.to_numpy(),
             "commission": commission.to_numpy(),
+            "stop_commission": stop_commission.to_numpy(),
             "slippage": slippage.to_numpy(),
             "n_positions": n_positions.to_numpy(),
+            "n_stops": n_stops.to_numpy(),
             "gross_exposure": (long_notional + short_notional).to_numpy(),
             "net_exposure": (long_notional - short_notional).to_numpy(),
         }
@@ -407,6 +446,11 @@ def backtest_weekly(
         pd.Series(turnover.to_numpy(), index=held_dates, name="turnover"),
         bench=bench_aligned,
     )
+    # Stop-loss diagnostics piggy-backed onto the summary Series so they
+    # surface in the reports/backtest_summary.csv aggregation step.
+    summary["n_stops_total"] = int(n_stops.sum())
+    summary["stop_loss_savings_total"] = float(stop_loss_savings.sum())
+    summary["stop_commission_total"] = float(stop_commission.sum())
 
     trades = _trades_long(weights)
 

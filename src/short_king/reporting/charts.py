@@ -345,6 +345,56 @@ def _growth_of_one(r: pd.Series) -> pd.Series:
     return (1.0 + r.fillna(0.0)).cumprod()
 
 
+# Distinct, well-separated colours for the five models. Chosen to be
+# colour-blind-friendly (Wong-style palette).
+_MODEL_COLORS: dict[str, str] = {
+    "naive":    "#000000",  # black
+    "ew":       "#0072B2",  # strong blue
+    "logit":    "#009E73",  # vivid green
+    "gbm_cls":  "#D55E00",  # vermilion
+    "gbm_rank": "#CC79A7",  # mauve
+}
+# Fallback cycle for any model name not in the explicit map.
+_FALLBACK_MODEL_COLORS: tuple[str, ...] = (
+    "#56B4E9", "#E69F00", "#999999", "#F0E442", "#000000",
+)
+
+# Linestyles per strategy family. Short-only books are solid; the
+# dollar-neutral long-short variant is rendered as a dotted line so the two
+# strategies are visually unambiguous even when colours land near each other.
+_STRATEGY_STYLES: dict[str, tuple[str, float]] = {
+    "short":    ("solid",  1.8),  # *_short, decile_short, quintile_short, top_k_short
+    "long":     ("solid",  1.8),
+    "ls":       ((0, (1.5, 1.5)), 1.6),  # dotted
+}
+
+
+def _parse_label(col: str) -> tuple[str, str]:
+    """Split a "model/strategy" column label into its parts.
+
+    Falls back gracefully for any other label shape (the whole string becomes
+    the "model" and the strategy is left empty so the styling cycle is used).
+    """
+    s = str(col).strip()
+    if "/" in s:
+        model, strat = s.split("/", 1)
+        return model.strip().lower(), strat.strip().lower()
+    return s.lower(), ""
+
+
+def _style_for(model: str, strategy: str, color_idx: int) -> tuple[str, tuple, float]:
+    """(color, linestyle, linewidth) for a (model, strategy) pair."""
+    color = _MODEL_COLORS.get(model) or _FALLBACK_MODEL_COLORS[
+        color_idx % len(_FALLBACK_MODEL_COLORS)
+    ]
+    # Strategy family: anything with "long_short" / "ls" gets the dotted style.
+    if "long_short" in strategy or strategy in ("ls", "long-short"):
+        ls, lw = _STRATEGY_STYLES["ls"]
+    else:
+        ls, lw = _STRATEGY_STYLES["short"]
+    return color, ls, lw
+
+
 def chart_cumulative_returns(
     returns: pd.DataFrame,
     path: Path,
@@ -353,44 +403,53 @@ def chart_cumulative_returns(
 ) -> Path:
     """Multi-line growth-of-$1 chart for one or more strategies plus a benchmark.
 
-    ``returns`` columns are interpreted by name so the palette is consistent
-    across the report: any column literally named 'long' or 'short' (case-
-    insensitive) gets the brand colour; everything else cycles through a muted
-    secondary palette.
+    Column names are parsed as ``"<model>/<strategy>"`` (the convention emitted
+    by ``scripts/06_backtest.py``):
+
+    * Each *model* gets its own colour from a colour-blind-safe palette
+      (``naive`` black, ``ew`` blue, ``logit`` green, ``gbm_cls`` vermilion,
+      ``gbm_rank`` mauve).
+    * The *strategy* picks the linestyle — short-only books are **solid** and
+      the dollar-neutral long-short books are **dotted**.
+
+    Columns that don't follow the ``model/strategy`` shape still render but
+    pick up styling from a fallback cycle.
     """
     if not isinstance(returns, pd.DataFrame) or returns.empty:
         raise ValueError("chart_cumulative_returns: returns must be a non-empty DataFrame")
 
-    fig, ax = _new_fig(figsize=(11.0, 6.0))
-    secondary = ["#5B8EBF", "#888888", "#B58A3E", "#5D8C5A"]
-    sec_idx = 0
-    for col in returns.columns:
+    fig, ax = _new_fig(figsize=(12.0, 6.5))
+    color_idx = 0
+    # Sort columns so the legend groups by model then strategy.
+    sorted_cols = sorted(returns.columns, key=lambda c: _parse_label(c))
+    for col in sorted_cols:
         growth = _growth_of_one(returns[col])
-        name = str(col).strip().lower()
-        if name in ("long", "long_only"):
-            color, lw = COLOR_LONG, 2.0
-        elif name in ("short", "short_only"):
-            color, lw = COLOR_SHORT, 2.0
-        elif name in ("ls", "long_short", "long-short"):
-            color, lw = "#1F1F1F", 2.2
-        else:
-            color, lw = secondary[sec_idx % len(secondary)], 1.4
-            sec_idx += 1
-        ax.plot(growth.index, growth.values, label=str(col), color=color, linewidth=lw)
+        model, strategy = _parse_label(col)
+        color, ls, lw = _style_for(model, strategy, color_idx)
+        if model not in _MODEL_COLORS:
+            color_idx += 1
+        ax.plot(
+            growth.index, growth.values,
+            label=str(col), color=color, linewidth=lw, linestyle=ls,
+        )
 
     if bench is not None and len(bench) > 0:
         bench_growth = _growth_of_one(bench)
         ax.plot(
             bench_growth.index, bench_growth.values,
             label=str(bench.name or "benchmark"),
-            color=COLOR_BENCH, linewidth=1.5, linestyle="--",
+            color=COLOR_BENCH, linewidth=1.4, linestyle=(0, (5, 3)),
         )
 
     ax.axhline(1.0, color="#999999", linewidth=0.6, linestyle=":")
-    ax.set_title("Cumulative growth of $1", fontsize=13, fontweight="bold")
+    ax.set_title(
+        "Cumulative growth of $1 — solid = short-only, dotted = long-short",
+        fontsize=13, fontweight="bold",
+    )
     ax.set_xlabel("Date")
     ax.set_ylabel("Growth of $1")
-    ax.legend(loc="best", fontsize=9, frameon=False)
+    ax.legend(loc="best", fontsize=9, frameon=False, ncol=2)
+    ax.grid(axis="y", linestyle=":", alpha=0.35)
     fig.autofmt_xdate()
     return _save(fig, path)
 
