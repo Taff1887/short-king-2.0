@@ -131,8 +131,11 @@ def _walkforward_predict(
 
     out = pd.Series(np.nan, index=df.index, name="score", dtype="float64")
     for fold_id, sp in enumerate(splits):
-        X_tr = df.iloc[sp.train_idx][feat_cols]
-        X_te = df.iloc[sp.test_idx][feat_cols]
+        # Cast feature matrix to plain float64 ndarray — some *_rk columns
+        # are pandas extension Float64 (nullable), which breaks np.isfinite
+        # and tree-model native arrays.
+        X_tr = df.iloc[sp.train_idx][feat_cols].astype("float64", copy=False)
+        X_te = df.iloc[sp.test_idx][feat_cols].astype("float64", copy=False)
         y_tr = y.iloc[sp.train_idx]
 
         # Drop NaN labels from training, leave test predictions unconstrained.
@@ -206,8 +209,28 @@ def main() -> int:
     naive_score = naive_si_rank(df).reindex(df.index)
 
     # --- 2. EW composite -----------------------------------------------------
-    logger.info("model: ew_composite (no fit; equal-weight blend of *_rk cols)")
-    ew_score = ew_composite(df).reindex(df.index)
+    # The baselines module's DEFAULT_EW_COLS expects coarse theme ranks
+    # (short_rk/momentum_rk/...) which don't exist in our feature panel - we
+    # rank individual factors, not themes. Hand-pick one representative rank
+    # column per family. Missing columns are tolerated by ew_composite.
+    _EW_COLS = [
+        c for c in (
+            "short_pct_ff_rk",        # short interest as % of free float
+            "ShortPct_rk",            # raw short pct (fallback)
+            "si_z_52w_rk",            # SI z-score
+            "mom_12w_rk",             # 12-week price momentum
+            "vol_4w_rk",              # short-term realised vol
+            "log_mktcap_rk",          # size
+            "pe_rk", "fcf_yield_rk",  # valuation (expensive = positive)
+            "roe_rk", "roic_rk",      # quality
+            "debt_equity_rk",         # leverage
+            "revenue_growth_yoy_rk",  # growth
+        ) if c in df.columns
+    ]
+    logger.info(
+        f"model: ew_composite (no fit; equal-weight blend over {len(_EW_COLS)} *_rk cols)"
+    )
+    ew_score = ew_composite(df, cols=_EW_COLS).reindex(df.index)
 
     # --- 3. Logistic regression (walk-forward) -------------------------------
     logger.info("model: logit (walk-forward)")
