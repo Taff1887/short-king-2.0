@@ -201,10 +201,10 @@ def test_stop_loss_caps_position_loss_at_floor_and_charges_extra_commission() ->
     assert res_no.returns["ret_gross"].iloc[0] == pytest.approx(-0.15, abs=1e-12)
     assert int(res_no.returns["n_stops"].iloc[0]) == 0
 
-    # 15 % stop -> floor = -0.5 * 0.15 = -0.075 (7.5 % of book loss).
+    # 15 % stop with zero slippage -> floor = -0.5 * 0.15 = -0.075.
     cfg_stop = CostConfig(
         bps_round_trip=25.0, slippage_bps=0.0, annual_borrow_pct=0.0,
-        stop_loss_pct=0.15,
+        stop_loss_pct=0.15, stop_slippage_pct=0.0,
     )
     res = backtest_weekly(weights, prices, cost_config=cfg_stop)
     assert res.returns["ret_gross"].iloc[0] == pytest.approx(-0.075, abs=1e-12)
@@ -222,6 +222,33 @@ def test_stop_loss_caps_position_loss_at_floor_and_charges_extra_commission() ->
     # Summary diagnostics.
     assert int(res.summary["n_stops_total"]) == 1
     assert res.summary["stop_commission_total"] == pytest.approx(expected_stop_commission, abs=1e-12)
+
+
+def test_stop_loss_slippage_deepens_the_floor_when_triggered() -> None:
+    """With ``stop_slippage_pct = 0.02`` on top of a 15 % trigger, a stop that
+    fires should fill at the deeper floor (-17 % of the position notional)
+    rather than the trigger price. The ``stop_slippage_drag`` diagnostic
+    must report the exact slippage cost."""
+    dates = pd.to_datetime(["2024-01-05", "2024-01-12"])
+    weights = pd.DataFrame([
+        {"Date": dates[0], "Ticker": "XYZ", "weight": -0.5},
+        {"Date": dates[1], "Ticker": "XYZ", "weight": -0.5},
+    ])
+    # 50 % rally - well past the 15 % trigger.
+    prices = pd.DataFrame([
+        {"Date": dates[0], "Ticker": "XYZ", "adjClose": 100.0},
+        {"Date": dates[1], "Ticker": "XYZ", "adjClose": 150.0},
+    ])
+
+    cfg = CostConfig(
+        bps_round_trip=0.0, slippage_bps=0.0, annual_borrow_pct=0.0,
+        stop_loss_pct=0.15, stop_slippage_pct=0.02,
+    )
+    res = backtest_weekly(weights, prices, cost_config=cfg)
+    # Effective floor = -(0.15 + 0.02) * |w| = -0.085 of book.
+    assert res.returns["ret_gross"].iloc[0] == pytest.approx(-0.085, abs=1e-12)
+    # Slippage drag = 0.02 * |stopped_w| = 0.02 * 0.5 = 0.01 of book.
+    assert res.returns["stop_slippage_drag"].iloc[0] == pytest.approx(0.01, abs=1e-12)
 
 
 def test_stop_loss_does_not_fire_on_normal_returns() -> None:

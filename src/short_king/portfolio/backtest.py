@@ -67,15 +67,25 @@ class CostConfig:
         prime-broker structures charge a leverage/financing fee on the
         long leg). Default False - shorts only.
     stop_loss_pct:
-        Per-position hard stop. Any position whose realised weekly P&L is
-        worse than ``-stop_loss_pct * |weight|`` is clipped to that floor
-        (i.e. the position is treated as having been exited at the stop
-        price). Each stop trigger also incurs an extra round-trip
-        commission to model the in-week exit *and* the re-entry that the
-        rebalance-level delta-commission would otherwise miss. Set to
-        ``None`` (or ``>= 1.0``) to disable. Default 0.15 reflects the v1
-        notebook's hard-stop convention and is the standard short-squeeze
-        guard for ASX small/mid-caps.
+        Per-position hard stop *trigger*. Any position whose realised weekly
+        P&L is worse than ``-stop_loss_pct * |weight|`` is clipped to a
+        slightly deeper floor that includes ``stop_slippage_pct`` (see
+        below) to reflect that real stops do not fill at the trigger price.
+        Each stop also incurs an extra round-trip commission to model the
+        in-week exit *and* the re-entry that the rebalance-level
+        delta-commission would otherwise miss. Set to ``None`` (or
+        ``>= 1.0``) to disable. Default 0.15 reflects the v1 notebook's
+        hard-stop convention and is the standard short-squeeze guard for
+        ASX small/mid-caps.
+    stop_slippage_pct:
+        Average execution shortfall on a stop fill, as a fraction of the
+        position notional. Realistic ranges for this universe: 10-30 bps
+        for ASX 50 names, 50-150 bps for mid-caps, 100-500 bps for
+        small-caps, 200-1000 bps on halted / takeover / squeeze names.
+        Default 0.01 (100 bps) is a balanced central estimate for a
+        top-500-by-short-interest book; 0.02 (200 bps) would be the
+        conservative headline number. The effective per-position floor
+        when a stop fires is ``-(stop_loss_pct + stop_slippage_pct) * |w|``.
     """
 
     bps_round_trip: float = 25.0
@@ -83,6 +93,7 @@ class CostConfig:
     slippage_bps: float = 5.0
     bench_borrow_for_longs: bool = False
     stop_loss_pct: float | None = 0.15
+    stop_slippage_pct: float = 0.01
 
 
 @dataclass
@@ -358,21 +369,33 @@ def backtest_weekly(
     gross_pre_stop = contrib_raw.sum(axis=1)
 
     # ---- Per-position hard stop ----------------------------------------------
-    # If a single position would lose more than ``stop_loss_pct`` of its own
-    # notional in the week, clip it to that floor. For a short with weight
-    # -0.05 and a 15 % stop, that caps the contribution at -0.0075 of book
-    # (= -15 % of the position's notional).
+    # Trigger: if a single position would lose more than ``stop_loss_pct`` of
+    # its own notional in the week. Execution: capped at a *deeper* floor of
+    # ``stop_loss_pct + stop_slippage_pct`` to reflect that real stops do not
+    # fill at the trigger price. For a -5 %-weight short with a 15 % stop and
+    # 1 % slippage, the floor is -0.05 * 0.16 = -0.008 of book.
     stop_pct = cfg.stop_loss_pct
+    slip_pct = float(cfg.stop_slippage_pct or 0.0)
     if stop_pct is not None and stop_pct < 1.0:
-        floor = -float(stop_pct) * w_held.abs()
-        stopped = contrib_raw < floor
+        trigger = -float(stop_pct) * w_held.abs()
+        floor = -(float(stop_pct) + slip_pct) * w_held.abs()
+        # A position is "stopped" the moment the raw contribution breaches the
+        # trigger - the deeper floor is just where the fill lands.
+        stopped = contrib_raw < trigger
         contrib_capped = contrib_raw.where(~stopped, floor)
     else:
         stopped = pd.DataFrame(False, index=contrib_raw.index, columns=contrib_raw.columns)
         contrib_capped = contrib_raw
     gross_per_week = contrib_capped.sum(axis=1)
     n_stops = stopped.sum(axis=1).astype(int)
-    stop_loss_savings = (gross_per_week - gross_pre_stop)  # >= 0 (clipping helps)
+    # Avoided loss = (gross_per_week - gross_pre_stop). With slippage > 0 this
+    # is still >= 0 unless slippage exceeds the raw move past the trigger,
+    # which can happen for borderline triggers - that's the realistic case
+    # where stop-slippage erodes some of the cap's benefit.
+    stop_loss_savings = (gross_per_week - gross_pre_stop)
+    # Diagnostic: how much of the floor came from slippage rather than the
+    # trigger itself - useful for sensitivity tables.
+    stop_slippage_drag = (slip_pct * (stopped.astype(float) * w_held.abs())).sum(axis=1)
 
     # Old weight = the previous *target* (no drift). For the first held week
     # the old weight is zero (book starts flat).
@@ -419,6 +442,7 @@ def backtest_weekly(
             "ret_gross": gross_per_week.to_numpy(),
             "ret_gross_pre_stop": gross_pre_stop.to_numpy(),
             "stop_loss_savings": stop_loss_savings.to_numpy(),
+            "stop_slippage_drag": stop_slippage_drag.to_numpy(),
             "ret_net": net_per_week.to_numpy(),
             "turnover": turnover.to_numpy(),
             "cost_total": cost_total.to_numpy(),
@@ -451,6 +475,7 @@ def backtest_weekly(
     summary["n_stops_total"] = int(n_stops.sum())
     summary["stop_loss_savings_total"] = float(stop_loss_savings.sum())
     summary["stop_commission_total"] = float(stop_commission.sum())
+    summary["stop_slippage_drag_total"] = float(stop_slippage_drag.sum())
 
     trades = _trades_long(weights)
 

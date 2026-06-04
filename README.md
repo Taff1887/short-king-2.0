@@ -4,8 +4,8 @@
 > 500-stock universe over 260 weekly rebalances (~5 years), ASIC weekly
 > short-position disclosures + FMP fundamentals, walk-forward CV with
 > purge + embargo, costed weekly backtest of five models across two
-> portfolio constructions, and a **15 % per-position hard stop** to guard
-> against short squeezes.
+> portfolio constructions, and a **15 % per-position hard stop with 100 bps
+> realistic slippage** to guard against short squeezes.
 
 This is a from-scratch rebuild of an earlier ASX short-interest prototype
 ([Taff1887/short-king](https://github.com/Taff1887/short-king)). The original
@@ -19,42 +19,97 @@ table and headline results below.
 ## Headline result
 
 The five models, scored across two portfolio constructions (top-quintile
-short and dollar-neutral long-short quintile), net of 25 bps round-trip
+short and dollar-neutral long-short quintile), **net of 25 bps round-trip
 commission per side + 1.5 % p.a. borrow + 5 bps slippage + per-stop
-exit-and-re-entry commission:
+exit-and-re-entry commission + 100 bps execution shortfall on every stop
+fill**:
 
 | model | strategy | CAGR | Vol | **Sharpe** | Sortino | MaxDD | Calmar | Hit-rate | Turnover (1-way) | Stops | n_rebalances |
 |---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| naive | long_short_quintile | **+34.5 %** | 13.4 % | **2.29** | 4.52 | −6.4 % | 5.38 | 60.8 % | 17.0 % | 1,172 | 212 |
-| logit | long_short_quintile | +20.6 % | 10.9 % | 1.77 | 3.53 | −9.8 % | 2.09 | 57.1 % | 30.3 % | 137 | 91 |
-| gbm_rank | long_short_quintile | +26.2 % | 19.8 % | 1.28 | 2.09 | −30.5 % | 0.86 | 60.6 % | 53.8 % | 687 | 99 |
-| gbm_cls | long_short_quintile | +18.7 % | 14.6 % | 1.25 | 2.11 | −22.4 % | 0.83 | 56.6 % | 75.9 % | 610 | 99 |
-| naive | quintile_short | +10.0 % | 21.7 % | 0.55 | 0.87 | −29.4 % | 0.34 | 49.5 % | 5.2 % | 568 | 212 |
-| gbm_rank | quintile_short | +17.4 % | 25.3 % | 0.76 | 1.31 | −35.2 % | 0.50 | 50.5 % | 30.2 % | 637 | 99 |
-| ew | long_short_quintile | +8.9 % | 15.2 % | 0.64 | 1.02 | −26.5 % | 0.34 | 50.0 % | 26.1 % | 1,003 | 212 |
-| gbm_cls | quintile_short | +4.5 % | 20.5 % | 0.32 | 0.53 | −34.9 % | 0.13 | 49.5 % | 39.0 % | 455 | 99 |
-| logit | quintile_short | −3.2 % | 16.1 % | −0.13 | −0.20 | −32.4 % | −0.10 | 48.4 % | 15.5 % | 89 | 91 |
-| ew | quintile_short | −10.9 % | 16.6 % | −0.61 | −0.86 | −53.5 % | −0.20 | 41.5 % | 13.3 % | 234 | 212 |
+| naive | long_short_quintile | **+30.1 %** | 13.5 % | **2.02** | 3.84 | −6.9 % | 4.37 | 59.0 % | 17.0 % | 1,172 | 212 |
+| logit | long_short_quintile | +18.6 % | 10.9 % | 1.62 | 3.13 | −10.8 % | 1.73 | 56.0 % | 30.3 % | 137 | 91 |
+| gbm_rank | long_short_quintile | +21.0 % | 20.0 % | 1.05 | 1.67 | −32.4 % | 0.65 | 57.6 % | 53.8 % | 687 | 99 |
+| gbm_cls | long_short_quintile | +14.4 % | 14.7 % | 0.99 | 1.61 | −24.3 % | 0.59 | 55.6 % | 75.9 % | 610 | 99 |
+| gbm_rank | quintile_short | +12.9 % | 25.6 % | 0.60 | 1.01 | −37.7 % | 0.34 | 50.5 % | 30.2 % | 637 | 99 |
+| naive | quintile_short | +8.2 % | 21.8 % | 0.47 | 0.73 | −30.5 % | 0.27 | 49.1 % | 5.2 % | 568 | 212 |
+| ew | long_short_quintile | +5.8 % | 15.4 % | 0.44 | 0.69 | −29.0 % | 0.20 | 49.1 % | 26.1 % | 1,003 | 212 |
+| gbm_cls | quintile_short | +1.7 % | 20.6 % | 0.18 | 0.30 | −36.7 % | 0.05 | 47.5 % | 39.0 % | 455 | 99 |
+| logit | quintile_short | −4.3 % | 16.1 % | −0.19 | −0.30 | −33.0 % | −0.13 | 47.3 % | 15.5 % | 89 | 91 |
+| ew | quintile_short | −11.6 % | 16.7 % | −0.65 | −0.90 | −54.7 % | −0.21 | 41.5 % | 13.3 % | 234 | 212 |
 
 ![Cumulative growth of $1 — solid = quintile-short, dotted = long-short](charts/cumulative_returns.png)
 
 **The headline.** The **naive long-short quintile** — rank by raw ShortPct,
-long the bottom 20 %, short the top 20 % — earns a Sharpe of **2.29** with
-a 6.4 % max drawdown, net of all costs. Every long-short quintile variant
-runs positive Sharpe; four of five clear 1.0. The short-only books are
-weaker (one positive, four flat-to-negative) — short-side alpha is real but
-not enough to overcome borrow on its own; the long leg of the quintile pair
-is what carries the headline.
+long the bottom 20 %, short the top 20 % — earns a Sharpe of **2.02** with
+a 6.9 % max drawdown, net of every modelled friction including 100 bps
+stop-fill slippage. Every long-short quintile variant runs positive Sharpe;
+three of five clear 1.0. The short-only books are weaker (two positive,
+three flat-to-negative) — short-side alpha is real but not enough to
+overcome borrow on its own; the long leg of the quintile pair is what
+carries the headline.
 
 **The 15 % per-position stop is doing real work.** Without it the same
 naive long-short was Sharpe 0.49 (deciles, no stop). The stop fired 1,172
 times over 212 weeks (~5.5 per week, on an average book of 170 names) and
-saved a cumulative 106 % of NAV vs. the un-clipped P&L. Roughly half the
-Sharpe lift comes from clipping squeeze-week losses, the other half from
-the quintile-vs-decile change (5 × wider buckets are less concentrated and
-turnover drops accordingly). **This number assumes perfect stop execution
-at exactly −15 % per position** — see §[Limitations](#limitations); real
-ASX small-cap stops slip and the practical Sharpe is lower.
+saved a cumulative ~92 % of NAV net of the 100 bps stop-fill slippage
+(106 % gross, of which 14 % was eaten by the execution shortfall).
+Roughly half the Sharpe lift comes from clipping squeeze-week losses, the
+other half from the quintile-vs-decile change (5× wider buckets are less
+concentrated and turnover drops accordingly).
+
+### Stop-slippage sensitivity
+
+Re-runs of the long-short quintile across `stop_slippage_pct ∈ {0, 0.5, 1,
+1.5, 2 %}` — the 15 % trigger is fixed; only the average fill shortfall
+changes (see `scripts/_stop_sensitivity.py` for the sweep):
+
+| Model | 0 bps (perfect) | 50 bps | **100 bps (default)** | 150 bps | 200 bps (conservative) |
+|---|---:|---:|---:|---:|---:|
+| naive | 2.29 | 2.15 | **2.02** | 1.89 | 1.76 |
+| logit | 1.77 | 1.70 | **1.62** | 1.54 | 1.46 |
+| gbm_rank | 1.27 | 1.16 | **1.05** | 0.94 | 0.84 |
+| gbm_cls | 1.25 | 1.12 | **0.98** | 0.86 | 0.73 |
+| ew | 0.64 | 0.54 | **0.44** | 0.35 | 0.25 |
+
+Every additional 50 bps of slippage drops the naive L/S Sharpe by ~0.13. At
+the conservative 200 bps assumption the headline is **still 1.76** —
+institutional-grade — so the strategy's edge is robust to realistic
+execution friction within the range we'd expect for this universe.
+
+### Top short candidates — as-of 2026-05-22
+
+Top 15 names by *consensus rank* across the three trained models (`logit`
++ `gbm_cls` + `gbm_rank`). Higher rank = stronger short conviction —
+all three models agree the name sits in the bearish tail. Gated on
+investable + A$200m+ market cap. Full top-30 in
+[`reports/current_positions.csv`](reports/current_positions.csv); regenerate
+with `scripts/_current_positions.py`.
+
+| # | Ticker | Company | Mkt Cap (A$m) | Short % | logit | gbm_cls | gbm_rank | Consensus |
+|---:|---|---|---:|---:|---:|---:|---:|---:|
+| 1  | AMP | AMP Limited | 4,047 | 2.32 | 0.638 | 0.899 | 0.157 | 0.901 |
+| 2  | GDG | Generation Dev Group | 1,622 | 9.59 | 0.701 | 0.829 | −0.540 | 0.886 |
+| 3  | HMC | HMC Capital Limited | 1,143 | 6.94 | 0.684 | 0.749 | 1.055 | 0.882 |
+| 4  | RWC | Reliance Worldwide | 2,416 | 3.11 | 0.721 | 0.892 | −1.150 | 0.865 |
+| 5  | NUF | Nufarm Limited | 929 | 1.63 | 0.656 | 0.908 | −0.883 | 0.865 |
+| 6  | TYR | Tyro Payments | 439 | 5.49 | 0.665 | 0.903 | −1.178 | 0.847 |
+| 7  | DTL | Data#3 Limited | 1,307 | 5.12 | 0.651 | 0.755 | −0.279 | 0.830 |
+| 8  | ACL | AU Clinical Labs | 382 | 8.44 | 0.734 | 0.814 | −1.362 | 0.826 |
+| 9  | WTC | WiseTech Global | 12,366 | 7.83 | 0.736 | 0.686 | −0.531 | 0.807 |
+| 10 | MGH | Maas Group Holdings | 1,790 | 1.45 | 0.608 | 0.833 | −0.556 | 0.803 |
+| 11 | XRO | Xero Ltd | 12,936 | 3.49 | 0.768 | 0.696 | −0.992 | 0.785 |
+| 12 | PNV | Polynovo Limited | 787 | 10.37 | 0.610 | 0.762 | −0.381 | 0.775 |
+| 13 | CKF | Collins Foods Ltd | 1,004 | 0.86 | 0.652 | 0.848 | −1.811 | 0.763 |
+| 14 | VSL | Vulcan Steel | 771 | 0.83 | 0.701 | 0.880 | −2.282 | 0.762 |
+| 15 | ARB | ARB Corporation | 1,503 | 3.76 | 0.628 | 0.803 | −1.210 | 0.760 |
+
+The list reads cleanly as a real short-book: high-multiple growth names
+(WiseTech, Xero, Polynovo), already-shorted consumer/health/fin names
+(Generation Dev, AMP, AU Clinical Labs, Tyro), and a few cyclicals/
+mid-caps where the GBM is picking up earnings-quality / leverage signals
+even though ShortPct is low (AMP, ARB, Collins Foods). **Not** a list of
+fly-by-night small-caps — every name is ≥ A$200m and most are ASX 200/300
+constituents.
 
 ---
 
@@ -246,14 +301,16 @@ parse; `pdfplumber` is included as a Java-free fallback.
 
 ## Limitations
 
-* **Stop-loss execution is modelled as perfect**: any position that
-  would lose more than 15 % of its notional in a week is treated as
-  having been exited at exactly the −15 % floor. In a real ASX small-cap
-  squeeze, stops slip past the trigger — sometimes by 5-20 %, occasionally
-  by much more on gappy / halted names. With a slippage-on-stop adjustment
-  the headline Sharpe (currently 2.29 on naive L/S quintile) would drop
-  measurably. A future revision should add a `stop_slippage_bps`
-  parameter on top of the cap.
+* **Stop-loss execution slippage is modelled at 100 bps central / 200 bps
+  conservative** (`CostConfig.stop_slippage_pct`). When a position trips
+  the 15 % trigger, the engine fills it at the trigger *plus* this
+  slippage to reflect that real stops do not fill at the trigger price.
+  Realistic ranges for our universe: ~30 bps (ASX 50), ~100 bps (mid-cap),
+  100-500 bps (small-cap), 200-1000+ bps (halted / squeeze). The headline
+  Sharpe of 2.02 uses 100 bps; the sensitivity table above quantifies the
+  effect of dialling this up. **Tail-risk slippage on individual halted
+  names is not separately modelled** — a takeover-bid-driven 50 % gap on
+  a single short would still be capped at the floor in the engine.
 * **Window choice (2022-2026)** captures the meme-stock era + post-COVID
   rally + 2022 bear + 2023-2025 AI rally. A longer (2010+) window would
   dampen the regime effect; the sister `quant-factor-ranking` project
