@@ -15,7 +15,7 @@ import datetime as dt
 import pandas as pd
 
 from short_king.data.fmp_client import FMPClient
-from short_king.data.prices import fetch_many_adjusted
+from short_king.data.prices import fetch_many_adjusted, fetch_many_market_cap
 from short_king.utils.config import settings
 from short_king.utils.io import read_parquet, write_parquet
 from short_king.utils.logging import logger
@@ -68,12 +68,25 @@ def main() -> int:
     out_path = settings.processed_dir / "prices_long.parquet"
     write_parquet(prices, out_path)
 
+    # FMP historical-market-cap is the correct daily mktCap (split-adjusted
+    # share count), which the assemble step prefers over the broken
+    # `sharesOutstanding * adjClose` derivation. Persisted separately so the
+    # assembly step can do a clean as-of join.
+    logger.info(f"fetching FMP historical-market-cap for {len(symbols)} symbols")
+    mcap = fetch_many_market_cap(symbols, start=start, end=end, client=client)
+    mcap_path = settings.processed_dir / "marketcap_long.parquet"
+    if not mcap.empty:
+        write_parquet(mcap, mcap_path)
+    else:
+        logger.warning("mktCap fetch returned zero rows - assemble step will fall back to shares*price")
+
     n_sym = prices["symbol"].nunique()
     n_dates = prices["date"].nunique()
+    n_mcap = mcap["symbol"].nunique() if not mcap.empty else 0
     t1 = dt.datetime.now()
     logger.info(
-        f"03_pull_fmp_prices: wrote {out_path} | rows={len(prices):,} "
-        f"symbols={n_sym} dates={n_dates} | took {(t1 - t0).total_seconds():.1f}s"
+        f"03_pull_fmp_prices: wrote {out_path} | prices={len(prices):,} ({n_sym} symbols, {n_dates} dates) "
+        f"| mktCap={len(mcap):,} ({n_mcap} symbols) | took {(t1 - t0).total_seconds():.1f}s"
     )
     return 0
 

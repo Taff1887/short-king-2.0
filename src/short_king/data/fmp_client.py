@@ -127,6 +127,20 @@ class FMPClient:
         )
         return data or []
 
+    def historical_market_capitalization(self, symbol: str) -> list[dict]:
+        """Daily historical market capitalisation, in the issuer's reporting
+        currency. FMP computes this from split-adjusted shares outstanding ×
+        unadjusted close, so corporate actions (e.g. reverse splits) are
+        reflected correctly. Use this rather than ``sharesOutstanding × adjClose``
+        from the balance sheet — the BS endpoint reports the share count *as of*
+        the latest period-end (no split back-adjustment), which breaks during
+        the quarters around a consolidation."""
+        data = self.get(
+            "historical-market-capitalization",
+            params={"symbol": symbol},
+        )
+        return data or []
+
     # -- company profile ---------------------------------------------------
     def profile(self, symbol: str) -> list[dict]:
         """Company profile — sector, industry, mktCap, averageVolume, beta, ..."""

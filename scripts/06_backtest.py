@@ -77,11 +77,11 @@ def _build_prices_panel(clean: pd.DataFrame, features: pd.DataFrame) -> pd.DataF
     return panel
 
 
-def _summary_row(model: str, strategy: str, result) -> dict:
-    """BacktestResult.summary -> the task's flat row schema."""
+def _summary_row(model: str, strategy: str, period: str, result) -> dict:
+    """BacktestResult.summary -> the flat row schema (incl. IS / OOS / ALL tag)."""
     s = result.summary
     return {
-        "model": model, "strategy": strategy,
+        "model": model, "strategy": strategy, "period": period,
         "CAGR": float(s.get("CAGR", float("nan"))),
         "vol": float(s.get("ann_vol", float("nan"))),
         "Sharpe": float(s.get("Sharpe", float("nan"))),
@@ -197,10 +197,35 @@ def main() -> int:
             out_path = settings.reports_dir / f"{bt_prefix}_{model_name}_{strategy_name}.parquet"
             write_parquet(result.returns, out_path)
 
-            summary_rows.append(_summary_row(model_name, strategy_name, result))
+            # Combined (ALL) summary row.
+            summary_rows.append(_summary_row(model_name, strategy_name, "ALL", result))
             returns_panel[f"{model_name}/{strategy_name}"] = _returns_series(
                 result.returns, f"{model_name}/{strategy_name}"
             )
+
+            # Per-period IS / OOS summaries if the OOF has a `period` tag.
+            if "period" in model_oof.columns:
+                ret_with_period = result.returns.merge(
+                    model_oof[[_DATE_COL, "period"]].drop_duplicates(_DATE_COL),
+                    on=_DATE_COL, how="left",
+                )
+                for period_label in ("IS", "OOS"):
+                    sub = ret_with_period[ret_with_period["period"] == period_label]
+                    if len(sub) < 6:
+                        continue
+                    from short_king.portfolio.backtest import _summarise_returns  # type: ignore
+                    sub_summary = _summarise_returns(
+                        net=sub.set_index(_DATE_COL)["ret_net"],
+                        gross=sub.set_index(_DATE_COL)["ret_gross"],
+                        turnover=sub.set_index(_DATE_COL)["turnover"],
+                        periods_per_year=periods_per_year,
+                    )
+                    # Forward summary into a synthetic Result-like for _summary_row.
+                    class _R:
+                        summary = sub_summary
+                    sr = _summary_row(model_name, strategy_name, period_label, _R())
+                    sr["n_rebalances"] = int(len(sub))
+                    summary_rows.append(sr)
 
             logger.info(
                 f"backtest {model_name}/{strategy_name}: weeks={int(result.summary.get('n_weeks', 0))} "

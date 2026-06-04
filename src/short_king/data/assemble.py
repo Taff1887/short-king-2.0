@@ -217,6 +217,7 @@ def assemble_pit_panel(
     fundamentals: dict[str, pd.DataFrame],
     prices_long: pd.DataFrame,
     *,
+    market_cap_long: pd.DataFrame | None = None,
     min_mkt_cap: float = DEFAULT_MIN_MKT_CAP_AUD,
     max_stale_quarters: int = DEFAULT_MAX_FILING_STALE_QUARTERS,
     forward_horizons_weeks: tuple[int, ...] = (1, 4, 12),
@@ -283,19 +284,47 @@ def assemble_pit_panel(
             continue
         df = _normalise_dates(df.copy(), ("date", "acceptedDate", "filingDate"))
         keep_cols = ("symbol", "fiscalYear", "period")
-        # Some FMP endpoints (notably enterprise_values) lack fiscalYear/period
-        # -- they're keyed only by period-end ``date``. We can't PIT-join those
-        # by the fiscal key, so we skip them with a warning. (A future
-        # enhancement would asof-join them on ``period_end`` instead.)
         missing = [k for k in keep_cols if k not in df.columns]
         if missing:
-            logger.warning(
-                f"assemble: skipping endpoint '{ep}' - missing join keys {missing}. "
-                f"Available columns: {list(df.columns)[:8]}..."
+            # Endpoints lacking fiscalYear/period (e.g. enterprise_values) are
+            # keyed only by period-end ``date``. As-of-join them on date instead
+            # of skipping - this is how we pick up enterprise_values's
+            # ``marketCapitalization`` field across history (the primary
+            # mktCap source, since balance-sheet ``commonStockSharesOutstanding``
+            # is stamped-at-latest-period-end and breaks across reverse splits).
+            if "date" not in df.columns:
+                logger.warning(
+                    f"assemble: skipping endpoint '{ep}' - no fiscalYear/period AND no date column"
+                )
+                continue
+            logger.info(
+                f"assemble: as-of-joining endpoint '{ep}' on (symbol, date) since "
+                f"it lacks {missing}"
             )
+            df["date"] = pd.to_datetime(df["date"]).dt.normalize().astype("datetime64[ns]")
+            df = df.drop(
+                columns=[c for c in ("acceptedDate", "filingDate") if c in df.columns]
+            )
+            # merge_asof requires globally-sorted ``on`` keys on BOTH sides.
+            # ``by`` (symbol) is only used to bucket; the on-key must be sorted.
+            df = df.drop_duplicates(subset=["symbol", "date"]).sort_values("date").reset_index(drop=True)
+            df = _prefix_cols(df, prefix=ep, keep=("symbol", "date"))
+            # Build (symbol, date) sorted left side for merge_asof.
+            left = panel[["symbol", "Date"]].copy()
+            left["Date"] = pd.to_datetime(left["Date"]).dt.normalize().astype("datetime64[ns]")
+            left["_row_order"] = np.arange(len(left))
+            left_sorted = left.sort_values("Date").reset_index(drop=True)
+            joined = pd.merge_asof(
+                left_sorted, df.rename(columns={"date": "Date"}),
+                on="Date", by="symbol", direction="backward",
+            )
+            joined = joined.sort_values("_row_order").reset_index(drop=True)
+            # Append the new columns onto the panel (keyed by original row order).
+            new_cols = [c for c in joined.columns if c.startswith(f"{ep}_")]
+            for c in new_cols:
+                panel[c] = joined[c].to_numpy()
             continue
-        # 'date' and 'acceptedDate' from core endpoints are already represented
-        # by 'period_end' / 'acceptedDate' on the panel -- drop to avoid clobber.
+        # Endpoints with the fiscal join key.
         df = df.drop(columns=[c for c in ("date", "acceptedDate", "filingDate") if c in df.columns])
         df = df.drop_duplicates(subset=list(keep_cols))
         df = _prefix_cols(df, prefix=ep, keep=keep_cols)
@@ -303,9 +332,15 @@ def assemble_pit_panel(
     panel = panel.rename(columns={"symbol": "Symbol"})
 
     # --- Market cap (PIT) -------------------------------------------------
-    # sharesOutstanding from the balance sheet's most-recent PIT filing.
-    bs_shares_col = "balance_sheet_commonStockSharesOutstanding"  # FMP stable name
-    alt_shares_col = "balance_sheet_weightedAverageShsOut"  # very rare fallback
+    # Primary source: FMP's `historical-market-capitalization` endpoint, which
+    # is split-adjusted at the share-count level. This is the correct mktCap
+    # for issuers that have been through reverse splits (e.g. Paladin Energy's
+    # 100:1 in 2024) — the balance-sheet `commonStockSharesOutstanding` field
+    # is stamped at period-end and is NOT back-adjusted, so combining it with
+    # `adjClose` (which IS split-adjusted to today) produces a mktCap that is
+    # off by the split factor for any pre-split period.
+    bs_shares_col = "balance_sheet_commonStockSharesOutstanding"
+    alt_shares_col = "balance_sheet_weightedAverageShsOut"
     if bs_shares_col in panel.columns:
         shares = panel[bs_shares_col]
     elif "income_statement_weightedAverageShsOut" in panel.columns:
@@ -314,12 +349,74 @@ def assemble_pit_panel(
         shares = panel[alt_shares_col]
     else:
         shares = pd.Series(np.nan, index=panel.index, name="shares")
-        logger.warning(
-            "no shares-outstanding column found in balance sheet / income statement -- "
-            "mktCap will be NaN"
-        )
     panel["sharesOutstanding"] = pd.to_numeric(shares, errors="coerce")
-    panel["mktCap"] = panel["sharesOutstanding"] * panel["adjClose"]
+
+    # Compute the shares-times-price fallback (last resort).
+    mc_fallback = panel["sharesOutstanding"] * panel["adjClose"]
+
+    # PRIMARY source: enterprise_values_marketCapitalization (just attached by
+    # the as-of-join above). FMP records this at each fiscal period-end and it
+    # is split-aware (FMP recomputes when the issuer reverse-splits), so it is
+    # the correct historical mktCap for issuers like Paladin Energy that the
+    # balance-sheet share-count approach mangles.
+    ev_mcap_col = "enterprise_values_marketCapitalization"
+    if ev_mcap_col in panel.columns:
+        mc_ev = pd.to_numeric(panel[ev_mcap_col], errors="coerce")
+        n_ev = int(mc_ev.notna().sum())
+        logger.info(
+            f"mktCap: enterprise_values.marketCapitalization covers {n_ev:,}/{len(panel):,} rows "
+            f"({100*n_ev/max(len(panel),1):.1f}%)"
+        )
+    else:
+        mc_ev = pd.Series(np.nan, index=panel.index, dtype="float64")
+
+    # SECONDARY source: FMP's daily historical-market-capitalization endpoint
+    # (only covers ~90d of history on most plans). Useful for the very latest
+    # rebalances where enterprise_values is staler than the live mktCap.
+    if market_cap_long is not None and not market_cap_long.empty:
+        mc = market_cap_long.copy()
+        # Normalise to the same (Symbol, Date) keys as the panel.
+        if "symbol" in mc.columns:
+            mc = mc.rename(columns={"symbol": "Symbol"})
+        mc["Date"] = pd.to_datetime(mc["date"]).dt.normalize().astype("datetime64[ns]")
+        mc = mc[["Symbol", "Date", "marketCap"]].dropna()
+        mc = mc.sort_values(["Symbol", "Date"]).reset_index(drop=True)
+
+        left = panel[["Symbol", "Date"]].copy()
+        left["Date"] = pd.to_datetime(left["Date"]).dt.normalize().astype("datetime64[ns]")
+        left = left.sort_values("Date").reset_index(drop=True)
+        joined = pd.merge_asof(
+            left,
+            mc.sort_values("Date").reset_index(drop=True),
+            on="Date",
+            by="Symbol",
+            direction="backward",
+            tolerance=pd.Timedelta(days=PRICE_TOLERANCE_DAYS),
+        )
+        mc_fmp = joined.set_index(["Symbol", "Date"])["marketCap"]
+        # Realign to the panel's row order.
+        panel_idx = pd.MultiIndex.from_arrays([panel["Symbol"].values, panel["Date"].values])
+        mc_hmc_aligned = pd.to_numeric(
+            mc_fmp.reindex(panel_idx).reset_index(drop=True), errors="coerce"
+        )
+        n_hmc = int(mc_hmc_aligned.notna().sum())
+        logger.info(
+            f"mktCap: historical-market-cap endpoint covers {n_hmc:,}/{len(panel):,} rows "
+            f"({100*n_hmc/max(len(panel),1):.1f}%) - daily, recent-history only"
+        )
+    else:
+        mc_hmc_aligned = pd.Series(np.nan, index=panel.index, dtype="float64")
+
+    # Compose: enterprise_values (primary, full history, split-aware) → daily
+    # historical-market-cap (newer, more current) → shares*price (last resort).
+    panel["mktCap"] = mc_ev.combine_first(mc_hmc_aligned).combine_first(mc_fallback)
+    n_ev_used = int(mc_ev.notna().sum())
+    n_hmc_used = int((mc_ev.isna() & mc_hmc_aligned.notna()).sum())
+    n_fb_used = int((mc_ev.isna() & mc_hmc_aligned.isna() & mc_fallback.notna()).sum())
+    logger.info(
+        f"mktCap composition: enterprise_values={n_ev_used:,} | historical-market-cap={n_hmc_used:,} "
+        f"| shares*price fallback={n_fb_used:,}"
+    )
 
     # --- Investable flag --------------------------------------------------
     panel["filing_stale_quarters"] = panel["filing_lag_days"] / DAYS_PER_QUARTER

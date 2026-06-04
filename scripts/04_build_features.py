@@ -88,6 +88,12 @@ def main() -> int:
 
     asic = read_parquet(asic_path)
     prices = read_parquet(prices_path)
+    # FMP historical-market-cap (split-adjusted at the share-count level) is
+    # the correct mktCap source; pulled by 03_pull_fmp_prices.py.
+    mcap_path = settings.processed_dir / "marketcap_long.parquet"
+    market_cap_long = read_parquet(mcap_path) if mcap_path.exists() else None
+    if market_cap_long is None:
+        logger.warning(f"{mcap_path} not found - assemble will use shares*price fallback")
     fmp_tables = {p.stem: read_parquet(p) for p in sorted(fmp_raw_dir.glob("*.parquet"))}
     # Make sure all 7 canonical endpoints are keyed even if any were empty / missing.
     from short_king.data.fundamentals import STATEMENT_ENDPOINTS
@@ -104,6 +110,7 @@ def main() -> int:
         asic_long=asic,
         fundamentals=fmp_tables,
         prices_long=prices,
+        market_cap_long=market_cap_long,
     )
     write_panel(panel, settings.processed_dir / "master_pit.parquet")
     logger.info(f"panel_quality_summary:\n{panel_quality_summary(panel)}")
@@ -137,17 +144,36 @@ def main() -> int:
     )
     out_features = write_feature_panel(features, settings.processed_dir / "features.parquet")
 
-    # 3b) Monthly snapshot - last available Friday in each calendar month.
-    # Saves a separate features_monthly.parquet so callers can pick either
-    # frequency without re-running the (cheap) feature build. Cross-sectional
-    # ranks are recomputed at month-end so they reflect month-end peers, not
-    # the weekly peer group.
+    # 3b) End-of-month snapshot - the LAST ASIC report in each calendar month.
+    # Because ASIC only publishes on trading days, every row's Date is by
+    # construction a valid ASX trading day. Most are Fridays; in months where
+    # Good Friday or Christmas falls on the last Friday, ASIC publishes the
+    # preceding Thursday (or following Monday) so the panel can include those
+    # day-of-week values - we audit the distribution below and log a warning
+    # if any month-end falls on a weekend (which would indicate a data bug).
     monthly = features.copy()
     monthly["Date"] = pd.to_datetime(monthly["Date"])
     monthly["_ym"] = monthly["Date"].dt.to_period("M")
-    last_friday_per_month = monthly.groupby("_ym")["Date"].transform("max")
-    monthly = monthly[monthly["Date"] == last_friday_per_month].drop(columns="_ym")
+    eom_per_month = monthly.groupby("_ym")["Date"].transform("max")
+    monthly = monthly[monthly["Date"] == eom_per_month].drop(columns="_ym")
     monthly = monthly.sort_values(["Date", "Ticker"]).reset_index(drop=True)
+
+    # Trading-day audit: every EOM rebalance date must be Mon-Fri.
+    eom_dates = monthly["Date"].drop_duplicates().sort_values()
+    dow_dist = eom_dates.dt.day_name().value_counts().to_dict()
+    weekend = eom_dates[eom_dates.dt.dayofweek > 4]
+    logger.info(f"EOM rebalance day-of-week distribution: {dow_dist}")
+    if len(weekend):
+        logger.error(f"EOM trading-day check FAILED: {len(weekend)} weekend dates found - data bug")
+    # How far from calendar month-end is each EOM Friday on average? A typical
+    # last-Friday-of-month is 0-6 days before the real month-end.
+    cal_eom = eom_dates.dt.to_period("M").dt.end_time.dt.normalize()
+    gap_days = (cal_eom - eom_dates).dt.days
+    logger.info(
+        f"EOM gap-to-calendar-month-end: median={int(gap_days.median())}d, "
+        f"max={int(gap_days.max())}d (lower is closer to true month-end)"
+    )
+
     out_monthly = write_feature_panel(
         monthly, settings.processed_dir / "features_monthly.parquet"
     )

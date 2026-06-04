@@ -94,6 +94,75 @@ def fetch_prices_full(
     return _clip(df, start, end)
 
 
+def fetch_market_cap(
+    symbol: str,
+    *,
+    start: str | None = None,
+    end: str | None = None,
+    client: FMPClient | None = None,
+) -> pd.DataFrame:
+    """FMP's daily historical market capitalisation for one symbol.
+
+    Returns ``[date, marketCap]`` ascending. FMP back-adjusts the share count
+    for corporate actions, so this is the correct source of mktCap for an
+    issuer that has gone through a reverse split (it's broken if you compute
+    ``balance_sheet.sharesOutstanding × adjClose`` because the BS endpoint
+    holds the latest share count flat through history).
+    """
+    client = client or FMPClient()
+    rows = client.historical_market_capitalization(symbol)
+    if not rows:
+        return pd.DataFrame(columns=["date", "marketCap"])
+    df = pd.DataFrame(rows)
+    if "marketCap" not in df.columns:
+        # FMP sometimes names this field marketCapitalization on certain plans
+        if "marketCapitalization" in df.columns:
+            df = df.rename(columns={"marketCapitalization": "marketCap"})
+        else:
+            logger.warning(f"mktCap {symbol}: no marketCap column in payload")
+            return pd.DataFrame(columns=["date", "marketCap"])
+    df = df[["date", "marketCap"]].copy()
+    df["date"] = pd.to_datetime(df["date"]).dt.normalize()
+    df = df.dropna(subset=["marketCap"]).sort_values("date").reset_index(drop=True)
+    return _clip(df, start, end).rename(columns={"marketCap": "marketCap"})
+
+
+def fetch_many_market_cap(
+    symbols: list[str],
+    *,
+    start: str | None = None,
+    end: str | None = None,
+    client: FMPClient | None = None,
+) -> pd.DataFrame:
+    """Bulk historical mktCap, stacked long as ``[symbol, date, marketCap]``.
+
+    Per-symbol failures are logged and skipped (the upstream caller falls back
+    to ``sharesOutstanding × adjClose`` for any symbol missing here)."""
+    client = client or FMPClient()
+    frames: list[pd.DataFrame] = []
+    n = len(symbols)
+    for i, sym in enumerate(symbols, 1):
+        try:
+            df = fetch_market_cap(sym, start=start, end=end, client=client)
+        except Exception as e:  # noqa: BLE001
+            logger.warning(f"mktCap {sym}: {e}")
+            df = pd.DataFrame(columns=["date", "marketCap"])
+        if not df.empty:
+            df = df.copy()
+            df["symbol"] = sym
+            frames.append(df)
+        if i % 50 == 0:
+            logger.info(f"mktCap: {i}/{n} symbols")
+    if not frames:
+        return pd.DataFrame(columns=["symbol", "date", "marketCap"])
+    out = pd.concat(frames, ignore_index=True)
+    return (
+        out[["symbol", "date", "marketCap"]]
+        .sort_values(["symbol", "date"])
+        .reset_index(drop=True)
+    )
+
+
 def fetch_many_adjusted(
     symbols: list[str],
     *,

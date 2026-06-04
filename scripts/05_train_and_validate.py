@@ -72,6 +72,16 @@ def _parse_args() -> argparse.Namespace:
              "unless explicitly overridden. Adjusts OOF parquet name to "
              "reports/oof_predictions_monthly.parquet.",
     )
+    p.add_argument(
+        "--holdout-months", type=int, default=36,
+        help="Reserve the LAST N months as a pure out-of-sample holdout. "
+             "Walk-forward CV runs only on the in-sample period (everything "
+             "before holdout_start). After CV, a single final model is fit "
+             "on the full IS data and scores the holdout - this is the honest "
+             "OOS performance estimate (CV folds are technically OOF too but "
+             "feature selection / hyperparameters may have implicitly seen "
+             "the later years). Default 36 = 3 years. Set to 0 to disable.",
+    )
     return p.parse_args()
 
 
@@ -215,6 +225,31 @@ def main() -> int:
     fwd_col = _resolve_fwd_ret(df, args.horizon_weeks)
     logger.info(f"using forward-return column: {fwd_col}")
 
+    # ---- In-sample / Out-of-sample split ------------------------------------
+    # Reserve the LAST `holdout_months` calendar months (or weeks, for the
+    # weekly run) as a pure OOS holdout. Walk-forward CV operates on the IS
+    # portion only. A final model is fit on the full IS data and scores the
+    # holdout - that holdout Sharpe is the unbiased OOS estimate.
+    dates_unique = pd.to_datetime(df[_DATE_COL].unique())
+    holdout_n = int(args.holdout_months)
+    if holdout_n > 0 and len(dates_unique) > holdout_n + (args.min_train_weeks or 12):
+        holdout_start = pd.to_datetime(sorted(dates_unique)[-holdout_n])
+        is_mask = df[_DATE_COL] < holdout_start
+        oos_mask = ~is_mask
+        logger.info(
+            f"IS/OOS split: holdout_start={holdout_start.date()} | "
+            f"IS rows={int(is_mask.sum()):,} ({pd.to_datetime(df.loc[is_mask, _DATE_COL]).min().date()} "
+            f"-> {pd.to_datetime(df.loc[is_mask, _DATE_COL]).max().date()}) | "
+            f"OOS rows={int(oos_mask.sum()):,} ({pd.to_datetime(df.loc[oos_mask, _DATE_COL]).min().date()} "
+            f"-> {pd.to_datetime(df.loc[oos_mask, _DATE_COL]).max().date()})"
+        )
+    else:
+        holdout_start = None
+        is_mask = pd.Series(True, index=df.index)
+        oos_mask = pd.Series(False, index=df.index)
+        if holdout_n > 0:
+            logger.warning("holdout disabled - not enough periods")
+
     feat_cols = _feature_cols(df)
     rk_cols = _rk_cols(df)
     if not feat_cols:
@@ -237,8 +272,47 @@ def main() -> int:
     )
     gbm_cfg = GBMConfig()
 
+    # IS-only frame for walk-forward CV.
+    df_is = df.loc[is_mask].reset_index(drop=True)
+    y_bin_is = y_bin.loc[is_mask].reset_index(drop=True)
+    y_rank_is = y_rank.loc[is_mask].reset_index(drop=True)
+
+    def _is_oos_score(
+        cv_score_is: pd.Series,
+        fit_predict: callable,
+        y_full: pd.Series,
+    ) -> pd.Series:
+        """Combine walk-forward IS scores with a final-model OOS prediction.
+
+        ``cv_score_is`` is positional-indexed against ``df_is``; ``fit_predict``
+        is the same callable used in walk-forward (X_tr, y_tr, X_te, train_idx).
+        We fit one final model on the entire IS panel and score the OOS rows.
+        The output is a Series of length ``len(df)``, IS rows from cv_score_is
+        and OOS rows from the final-model prediction (NaN where holdout is off).
+        """
+        full = pd.Series(np.nan, index=df.index, name="score", dtype="float64")
+        full.loc[is_mask] = cv_score_is.to_numpy()
+        if holdout_start is not None and int(oos_mask.sum()) > 0:
+            # Fit final model on the FULL IS panel (drop NaN labels + features).
+            X_full_is = df_is[feat_cols].astype("float64", copy=False)
+            keep = y_full.loc[is_mask].notna() & np.isfinite(X_full_is.to_numpy()).all(axis=1)
+            train_idx_is = np.where(keep.to_numpy())[0]
+            try:
+                X_te_oos = df.loc[oos_mask, feat_cols].astype("float64", copy=False)
+                oos_score = fit_predict(
+                    X_full_is.loc[keep].reset_index(drop=True),
+                    y_full.loc[is_mask].loc[keep].reset_index(drop=True),
+                    X_te_oos,
+                    train_idx_is,
+                )
+                full.loc[oos_mask] = np.asarray(oos_score, dtype="float64")
+            except Exception as exc:  # noqa: BLE001
+                logger.warning(f"OOS final-fit failed: {exc}")
+        return full
+
     # --- 1. Naive baseline ---------------------------------------------------
     logger.info("model: naive_si_rank (no fit; pure cross-sectional rank)")
+    # Naive scores the entire panel; both IS and OOS rows score naturally.
     naive_score = naive_si_rank(df).reindex(df.index)
 
     # --- 2. EW composite -----------------------------------------------------
@@ -277,10 +351,11 @@ def main() -> int:
         )
         return predict_logit_baseline(model, X_te, used_cols).to_numpy()
 
-    logit_score = _walkforward_predict(
-        df, feat_cols, y_bin, _fit_predict_logit,
-        model_name="logit", **wf_common,
+    logit_score_is = _walkforward_predict(
+        df_is, feat_cols, y_bin_is, _fit_predict_logit,
+        model_name="logit (IS CV)", **wf_common,
     )
+    logit_score = _is_oos_score(logit_score_is, _fit_predict_logit, y_bin)
 
     # --- 4. GBM classifier (walk-forward) ------------------------------------
     logger.info("model: gbm_cls (walk-forward)")
@@ -293,18 +368,22 @@ def main() -> int:
         )
         return predict_score(model, X_te, list(X_te.columns)).to_numpy()
 
-    gbm_cls_score = _walkforward_predict(
-        df, feat_cols, y_bin, _fit_predict_gbm_cls,
-        model_name="gbm_cls", **wf_common,
+    gbm_cls_score_is = _walkforward_predict(
+        df_is, feat_cols, y_bin_is, _fit_predict_gbm_cls,
+        model_name="gbm_cls (IS CV)", **wf_common,
     )
+    gbm_cls_score = _is_oos_score(gbm_cls_score_is, _fit_predict_gbm_cls, y_bin)
 
     # --- 5. GBM ranker (walk-forward) ----------------------------------------
     logger.info("model: gbm_rank (walk-forward)")
 
     def _fit_predict_gbm_rank(X_tr, y_tr, X_te, train_idx):
         # The ranker needs group_dates aligned with the (filtered) training rows.
-        # train_idx is the positional row index into ``df`` for the kept rows.
-        group_dates = df.iloc[train_idx][_DATE_COL].reset_index(drop=True)
+        # train_idx is the positional row index into the *source* frame we are
+        # cross-validating on (df_is during CV, df_is during final-fit) - use it
+        # to look up the matching Date column.
+        source = df_is  # IS-only frame; final-fit also reads from df_is
+        group_dates = source.iloc[train_idx][_DATE_COL].reset_index(drop=True)
         # Sort training rows by date so groups are contiguous (LightGBM requirement).
         order = np.argsort(group_dates.to_numpy(), kind="mergesort")
         X_tr_sorted = X_tr.iloc[order].reset_index(drop=True)
@@ -319,12 +398,15 @@ def main() -> int:
         )
         return predict_score(model, X_te, list(X_te.columns)).to_numpy()
 
-    gbm_rank_score = _walkforward_predict(
-        df, feat_cols, y_rank, _fit_predict_gbm_rank,
-        model_name="gbm_rank", **wf_common,
+    gbm_rank_score_is = _walkforward_predict(
+        df_is, feat_cols, y_rank_is, _fit_predict_gbm_rank,
+        model_name="gbm_rank (IS CV)", **wf_common,
     )
+    gbm_rank_score = _is_oos_score(gbm_rank_score_is, _fit_predict_gbm_rank, y_rank)
 
     # --- Stack OOF predictions long ------------------------------------------
+    period_labels = np.where(is_mask.to_numpy(), "IS", "OOS")
+
     def _stamp(name: str, score: pd.Series) -> pd.DataFrame:
         return pd.DataFrame(
             {
@@ -333,6 +415,7 @@ def main() -> int:
                 "model": name,
                 "score": score.reindex(df.index).to_numpy(),
                 _FWD_RET_COL: df[fwd_col].values,
+                "period": period_labels,
             }
         )
 
@@ -349,25 +432,32 @@ def main() -> int:
     write_parquet(oof, settings.reports_dir / oof_filename)
     logger.info(f"oof_predictions: {len(oof):,} rows across {oof['model'].nunique()} models")
 
-    # --- Per-model metrics ---------------------------------------------------
+    # --- Per-model metrics (computed separately for IS-CV vs OOS-holdout) ----
     rows: list[dict] = []
     for name, grp in oof.groupby("model"):
-        ic_series = rank_ic(grp["score"], grp[_FWD_RET_COL], by=grp[_DATE_COL])
-        ic_stats = ic_summary(ic_series if isinstance(ic_series, pd.Series) else pd.Series([ic_series]))
-        spread_series = decile_spread(
-            grp["score"], grp[_FWD_RET_COL], by=grp[_DATE_COL], n=10,
-        )
-        rows.append(
-            {
-                "model": name,
-                "ic_mean": float(ic_stats.get("mean", np.nan)),
-                "ic_t": float(ic_stats.get("t_stat", np.nan)),
-                "ic_hit_rate": float(ic_stats.get("hit_rate", np.nan)),
-                "ic_n_periods": int(ic_stats.get("n", 0)),
-                "decile_spread_mean": float(spread_series.mean()) if len(spread_series) else float("nan"),
-            }
-        )
-    metrics_df = pd.DataFrame(rows).sort_values("ic_mean", ascending=False)
+        for period_label in ("ALL", "IS", "OOS"):
+            sub = grp if period_label == "ALL" else grp[grp["period"] == period_label]
+            if sub.empty or sub["score"].isna().all():
+                continue
+            ic_series = rank_ic(sub["score"], sub[_FWD_RET_COL], by=sub[_DATE_COL])
+            ic_stats = ic_summary(
+                ic_series if isinstance(ic_series, pd.Series) else pd.Series([ic_series])
+            )
+            spread_series = decile_spread(
+                sub["score"], sub[_FWD_RET_COL], by=sub[_DATE_COL], n=10,
+            )
+            rows.append(
+                {
+                    "model": name,
+                    "period": period_label,
+                    "ic_mean": float(ic_stats.get("mean", np.nan)),
+                    "ic_t": float(ic_stats.get("t_stat", np.nan)),
+                    "ic_hit_rate": float(ic_stats.get("hit_rate", np.nan)),
+                    "ic_n_periods": int(ic_stats.get("n", 0)),
+                    "decile_spread_mean": float(spread_series.mean()) if len(spread_series) else float("nan"),
+                }
+            )
+    metrics_df = pd.DataFrame(rows).sort_values(["model", "period"])
     metrics_df.to_csv(settings.reports_dir / metrics_filename, index=False)
     logger.info(f"model_metrics:\n{metrics_df.to_string(index=False)}")
 
