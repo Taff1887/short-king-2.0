@@ -92,7 +92,12 @@ class CostConfig:
     annual_borrow_pct: float = 1.5
     slippage_bps: float = 5.0
     bench_borrow_for_longs: bool = False
-    stop_loss_pct: float | None = 0.15
+    # Stop loss disabled by default - see README §"What does the model look
+    # like with NO stop loss?". The naive per-position win-rate is 53.4 %
+    # in OOS without any floor, but the fat right-tail of squeezes makes the
+    # naked-short Sharpe negative. Users who want to add a stop pass
+    # `stop_loss_pct=0.15` (or whatever) to CostConfig explicitly.
+    stop_loss_pct: float | None = None
     stop_slippage_pct: float = 0.01
     # Annualisation factor: 52 for weekly rebalance, 12 for monthly, 4 for
     # quarterly. Used by ``_summarise_returns`` for CAGR / vol / Sharpe / borrow.

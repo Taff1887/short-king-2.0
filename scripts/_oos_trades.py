@@ -137,14 +137,21 @@ def main() -> int:
     # Position contribution before stop = signed_weight * stock_return.
     entry["pos_contrib_raw"] = entry["weight"] * entry["stock_ret"]
 
-    # Apply per-position 15 % stop with 100 bps slippage (same as headline).
-    stop_pct = cost.stop_loss_pct or 0.0
+    # Apply per-position stop (if configured). With the new default of
+    # stop_loss_pct=None the stop is disabled entirely — every position
+    # realises its raw monthly forward return.
+    stop_pct = cost.stop_loss_pct
     slip_pct = cost.stop_slippage_pct or 0.0
-    floor = -(stop_pct + slip_pct) * entry["weight"].abs()
-    trigger = -stop_pct * entry["weight"].abs()
-    stopped = entry["pos_contrib_raw"] < trigger
-    entry["stop_triggered"] = stopped
-    entry["pos_contrib"] = np.where(stopped, floor, entry["pos_contrib_raw"])
+    if stop_pct is None or stop_pct >= 1.0:
+        stopped = pd.Series(False, index=entry.index)
+        entry["stop_triggered"] = stopped
+        entry["pos_contrib"] = entry["pos_contrib_raw"]
+    else:
+        floor = -(stop_pct + slip_pct) * entry["weight"].abs()
+        trigger = -stop_pct * entry["weight"].abs()
+        stopped = entry["pos_contrib_raw"] < trigger
+        entry["stop_triggered"] = stopped
+        entry["pos_contrib"] = np.where(stopped, floor, entry["pos_contrib_raw"])
     # Per-position cost: commission + slippage on |weight| (entry + exit), plus
     # an extra round-trip when the stop fires. Borrow ~ short_weight * 1.5%/12.
     bps_round = cost.bps_round_trip / 10_000.0
@@ -162,9 +169,12 @@ def main() -> int:
     # trade_return positive when the stock falls: trade_return = stock_ret * sign(weight).
     # E.g. weight=-0.005, stock_ret=-0.10 -> trade_return = -0.10 * -1 = +0.10 (winning short).
     entry["trade_return"] = entry["stock_ret"] * np.sign(entry["weight"])
-    entry["trade_return_capped"] = np.where(
-        stopped, -(stop_pct + slip_pct), entry["trade_return"]
-    )
+    if stop_pct is None or stop_pct >= 1.0:
+        entry["trade_return_capped"] = entry["trade_return"]
+    else:
+        entry["trade_return_capped"] = np.where(
+            stopped, -(stop_pct + slip_pct), entry["trade_return"]
+        )
 
     # Attach the "why" features as-of the entry date.
     why_keys = [c for c, _ in WHY_COLS if c in features.columns]
@@ -229,14 +239,17 @@ def main() -> int:
         ]]
 
     md_path = settings.reports_dir / "oos_trades.md"
+    if stop_pct is None or stop_pct >= 1.0:
+        stop_desc = "**no stop loss** (per-position returns uncapped — same as the default headline backtest)"
+    else:
+        stop_desc = f"{stop_pct * 100:.0f} % stop + {slip_pct * 100:.0f} bps fill slippage"
     lines = [
         f"# OOS short trades — model = {args.model}",
         "",
         f"_Reconstructed from {len(entry):,} OOS short positions across "
         f"{entry['Ticker'].nunique()} unique tickers in the 36-month "
-        f"holdout (2023-06 → 2026-05). Per-position P&L applies the same "
-        f"15 % stop + 100 bps fill slippage + commission + borrow as the "
-        f"headline backtest._",
+        f"holdout (2023-06 → 2026-05). Per-position P&L applies "
+        f"{stop_desc} + commission + borrow as the headline backtest._",
         "",
         "**Columns:** "
         "`n_months_shorted` = number of monthly rebalances the ticker was in "

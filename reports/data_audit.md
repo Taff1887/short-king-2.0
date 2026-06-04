@@ -1,17 +1,17 @@
 # Data audit — short-king-2.0
 
-_Generated 2026-06-04 06:43 UTC_
+_Generated 2026-06-04 13:17 UTC_
 
 ## 1. Universe coverage
-- **asic_long**: 261,597 rows | 500 unique tickers | 830 dates | window 2010-07-05 → 2026-05-25
-- **prices_long**: 476,557 rows | 410 symbols | 1420 unique daily dates
-- **master_clean**: 261,597 rows | 86,492 investable (33.1%)
-- **features**: 261,597 rows × 1155 cols
+- **asic_long**: 262,251 rows | 500 unique tickers | 833 dates | window 2010-06-14 → 2026-05-25
+- **prices_long**: 1,327,654 rows | 356 symbols | 4376 unique daily dates
+- **master_clean**: 262,251 rows | 192,165 investable (73.3%)
+- **features**: 262,251 rows × 1178 cols
 
 ### Coverage by calendar year
 | Year | Rows | Unique tickers | Weeks |
 |---|---:|---:|---:|
-| 2010 | 5,939 | 262 | 26 |
+| 2010 | 6,593 | 262 | 29 |
 | 2011 | 13,065 | 284 | 52 |
 | 2012 | 13,549 | 293 | 53 |
 | 2013 | 14,174 | 312 | 52 |
@@ -32,30 +32,30 @@ _Generated 2026-06-04 06:43 UTC_
 ### Top-20 tickers by ASIC report frequency
 | Rank | Ticker | Weeks present |
 |---:|---|---:|
-| 1 | TLS | 830 |
-| 2 | ALL | 830 |
-| 3 | TAH | 830 |
-| 4 | SXL | 830 |
-| 5 | SUL | 830 |
-| 6 | STO | 830 |
-| 7 | SHL | 830 |
-| 8 | SGM | 830 |
-| 9 | SFR | 830 |
-| 10 | SEK | 830 |
-| 11 | RSG | 830 |
-| 12 | RRL | 830 |
-| 13 | RIO | 830 |
-| 14 | RHC | 830 |
-| 15 | QBE | 830 |
-| 16 | QAN | 830 |
-| 17 | PRU | 830 |
-| 18 | ANZ | 830 |
-| 19 | ANN | 830 |
-| 20 | AMP | 830 |
+| 1 | TLS | 833 |
+| 2 | ALL | 833 |
+| 3 | TAH | 833 |
+| 4 | SXL | 833 |
+| 5 | SUL | 833 |
+| 6 | STO | 833 |
+| 7 | SHL | 833 |
+| 8 | SGM | 833 |
+| 9 | SFR | 833 |
+| 10 | SEK | 833 |
+| 11 | RSG | 833 |
+| 12 | RRL | 833 |
+| 13 | RIO | 833 |
+| 14 | RHC | 833 |
+| 15 | QBE | 833 |
+| 16 | QAN | 833 |
+| 17 | PRU | 833 |
+| 18 | ANZ | 833 |
+| 19 | ANN | 833 |
+| 20 | AMP | 833 |
 
 ## 2. Data quality checks
 
-**Look-ahead audit**: 0 violations across 261,597 rows (max violation = 0 days).
+**Look-ahead audit**: 0 violations across 262,251 rows (max violation = 0 days).
 
 **Extreme weekly returns** (|ret_1w| > 150%): 0 cells (0 symbols).
 
@@ -86,28 +86,28 @@ _Generated 2026-06-04 06:43 UTC_
 
 **Market cap distribution** (A$m) on the cleaned panel:
 
-- p10: 111  p25: 318  p50: 989  p75: 3,535  p90: 11,851
-- min: 0  max: 3,182,459
+- p10: 100  p25: 297  p50: 918  p75: 3,254  p90: 10,506
+- min: 0  max: 268,473
 
-- **fwd_ret_1w**: n=86,475, mean=+0.0018, std=0.0914, |ret|>200% outliers=2, max=14.65, min=-0.99
-- **fwd_ret_4w**: n=85,794, mean=+0.0064, std=0.1789, |ret|>200% outliers=10, max=16.34, min=-0.94
-- **fwd_ret_12w**: n=83,048, mean=+0.0167, std=0.2926, |ret|>200% outliers=102, max=14.37, min=-0.95
+- **fwd_ret_1w**: n=192,221, mean=+0.0022, std=0.0716, |ret|>200% outliers=2, max=2.37, min=-0.97
+- **fwd_ret_4w**: n=191,310, mean=+0.0094, std=0.1467, |ret|>200% outliers=27, max=3.59, min=-0.97
+- **fwd_ret_12w**: n=188,908, mean=+0.0277, std=0.2643, |ret|>200% outliers=244, max=9.38, min=-0.97
 
 ## 3. FMP vs Yahoo Finance cross-check (monthly returns)
 
 Sample 50 ASX tickers (random, seed 42). For each: fetch Yahoo prices, compute month-end returns, compare to FMP's `adjClose` resampled to month-end. Reports Spearman correlation + median absolute difference of the month-end price levels.
 
-- **Coverage**: 50 symbols sampled, 40 ok, 2 warn, 1 mismatch, 7 insufficient.
-- **Median Spearman correlation** (monthly returns): 0.9996
-- **5th-percentile correlation** (worst-fit): 0.9760
-- **Median absolute price-level diff** (month-end): 0.054%
+- **Coverage**: 50 symbols sampled, 50 ok, 0 warn, 0 mismatch, 0 insufficient.
+- **Median Spearman correlation** (monthly returns): 1.0000
+- **5th-percentile correlation** (worst-fit): 0.9989
+- **Median absolute price-level diff** (month-end): 0.000%
 
 Five worst-fit symbols:
 
 | Symbol | n_months | corr | median_abs_diff_% | flag |
 |---|---:|---:|---:|---|
-| VRL.AX | 61 | 0.010 | 100.00 | mismatch |
-| SUN.AX | 61 | 0.890 | 14.62 | warn |
-| HLS.AX | 61 | 0.974 | 19.44 | warn |
-| AFG.AX | 61 | 0.996 | 1.81 | ok |
-| TOE.AX | 51 | 0.997 | 0.00 | ok |
+| EWC.AX | 206 | 0.990 | 0.00 | ok |
+| TUA.AX | 73 | 0.998 | 0.00 | ok |
+| AFG.AX | 134 | 0.999 | 0.00 | ok |
+| LOV.AX | 139 | 0.999 | 0.00 | ok |
+| BAP.AX | 147 | 0.999 | 0.00 | ok |

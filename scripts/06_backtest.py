@@ -41,11 +41,11 @@ def _parse_args() -> argparse.Namespace:
                    help="Annualised borrow fee on short positions, %% p.a.")
     p.add_argument("--slippage-bps", type=float, default=5.0,
                    help="One-sided slippage on weight changes, bps.")
-    p.add_argument("--stop-loss-pct", type=float, default=0.15,
+    p.add_argument("--stop-loss-pct", type=float, default=1.0,
                    help="Per-position hard-stop trigger (fraction of position notional). "
-                        "0.15 = clip any position whose weekly P&L would be worse than "
-                        "-15%% of its own notional. Each stop incurs an extra round-trip "
-                        "commission. Set to 1.0 to disable.")
+                        "Default 1.0 = DISABLED (no stop). Pass e.g. 0.15 to clip any "
+                        "position whose monthly P&L would be worse than -15%% of its own "
+                        "notional. Each stop incurs an extra round-trip commission.")
     p.add_argument("--stop-slippage-pct", type=float, default=0.01,
                    help="Average execution shortfall on stop fills (fraction of position "
                         "notional). 0.01 = 100bps central estimate for the top-500 ASX "

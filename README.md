@@ -7,7 +7,10 @@
 > known, not the as-of date), FMP fundamentals, Yahoo Finance prices
 > (cross-checked vs FMP at median ρ = 0.9996), 5 models walk-forward CV'd
 > with purge + embargo, **36-month pure out-of-sample holdout**, costed
-> backtest with 15 % per-position stop + 100 bps fill slippage.
+> backtest (25 bps commission + 1.5 % p.a. borrow + 5 bps slippage)
+> **with no per-position stop loss by default** — see §[Stop-level
+> sensitivity](#stop-level-sensitivity-sweep) for the impact of adding
+> one.
 
 A from-scratch rebuild of an earlier ASX short-interest prototype
 ([Taff1887/short-king](https://github.com/Taff1887/short-king)) — a single
@@ -17,7 +20,7 @@ and headline results below.
 
 ---
 
-## Headline result — IS vs OOS, monthly rebalance, full ASIC history
+## Headline result — IS vs OOS, monthly rebalance, NO stop loss
 
 The model dev (in-sample) period is **2010-06 → 2023-05** (~13 years; all
 walk-forward CV runs here, ~120 OOF monthly observations per trained
@@ -25,60 +28,82 @@ model). The pure out-of-sample holdout is **2023-06 → 2026-05** (36 months;
 final-fit model applied — never seen during development).
 
 Net of 25 bps round-trip commission per side + 1.5 % p.a. borrow + 5 bps
-slippage + 15 % per-position stop with 100 bps fill slippage + per-stop
-exit-and-re-entry commission. Annualisation factor = 12 (monthly).
+slippage. **No per-position stop loss** — every position realises its full
+monthly forward return, uncapped. Annualisation factor = 12 (monthly).
 
 ### Dollar-neutral long-short quintile (long bottom 20 %, short top 20 % by score)
 
 | Model | **IS Sharpe** | **OOS Sharpe** | OOS CAGR | OOS MaxDD | OOS Hit-rate |
 |---|---:|---:|---:|---:|---:|
-| **naive** (rank ShortPct) | 2.00 | **3.85** | **+44.9 %** | **−4.2 %** | 88.6 % |
-| **logit** (rebuilt v1) | 2.59 | **2.80** | +47.1 % | −6.5 % | 80.0 % |
-| gbm_rank (LightGBM LambdaRank) | 2.47 | 2.23 | +47.4 % | −15.0 % | 74.3 % |
-| gbm_cls (LightGBM binary) | 1.89 | 1.63 | +19.9 % | −11.4 % | 77.1 % |
-| ew (long-bias composite) | 0.77 | 1.41 | +25.5 % | −10.9 % | 60.0 % |
+| **naive** (rank ShortPct) | 0.57 | **0.92** | **+11.2 %** | **−10.8 %** | **68.6 %** |
+| logit (rebuilt v1) | 0.24 | 0.24 | +2.9 % | −37.1 % | 48.6 % |
+| ew (long-bias composite) | −0.38 | 0.08 | −0.4 % | −33.1 % | 54.3 % |
+| gbm_rank (LightGBM LambdaRank) | −0.06 | −0.21 | −8.2 % | −51.6 % | 37.1 % |
+| gbm_cls (LightGBM binary) | −0.10 | −1.11 | −16.3 % | −44.4 % | 45.7 % |
 
 ### Top-quintile short only (no long leg)
 
-| Model | IS Sharpe | OOS Sharpe | OOS CAGR | OOS MaxDD |
+| Model | OOS Sharpe | OOS CAGR | OOS MaxDD | OOS Hit-rate |
 |---|---:|---:|---:|---:|
-| logit | 0.59 | 1.42 | +29.7 % | −12.4 % |
-| gbm_rank | 0.97 | 1.31 | +32.1 % | −22.6 % |
-| gbm_cls | 0.32 | 0.74 | +13.4 % | −18.8 % |
-| naive | 0.40 | 0.62 | +10.4 % | −16.1 % |
-| ew | −0.55 | −0.73 | −9.5 % | −33.5 % |
+| logit | −0.20 | −6.3 % | −40.9 % | 48.6 % |
+| naive | −0.32 | −7.2 % | −35.7 % | 51.4 % |
+| gbm_rank | −0.50 | −15.2 % | −56.1 % | 40.0 % |
+| ew | −1.12 | −14.8 % | −42.5 % | 34.3 % |
+| gbm_cls | −1.11 | −18.9 % | −53.4 % | 34.3 % |
 
-### What does the model look like with NO stop loss?
+### What this honestly shows
 
-A fair question — is the strategy real, or is it just "the stop loss
-masking a broken model"? Re-running the OOS short book with the stop
-disabled gives a clean answer:
+**Only `naive` (rank by raw ShortPct) survives without a stop loss.** OOS
+Sharpe 0.92, CAGR +11.2 %, MaxDD −10.8 % — investable but not heroic. All
+four other models collapse to flat-or-negative Sharpe in OOS. The reason
+isn't that the trained models are wrong (their OOS *information
+coefficient* is still significantly negative — see the [IC table
+below](#information-coefficients--is-and-oos)); it's that **shorting on
+the ASX small / mid-cap tail has a structural fat right-tail of squeezes**
+(a single name can rally 200 %+ in a month) and the trained models
+concentrate into specific names that the market is *especially* bearish
+on — which are exactly the names most prone to squeezes (BrainChip,
+Appen, 4D Medical, Sunrise Resources etc.). Naive's broader, less-
+concentrated picks survive that.
 
-| Model | Win-rate (no stop) | Mean trade | Median trade | Worst single position | n positions losing > 50 % | OOS Sharpe (short leg) |
-|---|---:|---:|---:|---:|---:|---:|
-| **logit** | **53.4 %** | −0.33 % | **+1.71 %** | −218 % (APX 2024-07) | 42 | −0.51 |
-| gbm_rank | 52.5 % | −0.87 % | +1.85 % | −218 % (4DX 2025-08) | 71 | −0.63 |
-| naive | 50.9 % | 0.00 % | +0.43 % | −177 % (BRN 2024-01) | 11 | −0.42 |
-| gbm_cls | 50.8 % | −1.27 % | +0.38 % | −217 % (4DX) | 41 | −1.21 |
-| ew | 47.4 % | −0.56 % | −0.50 % | −50 % | 0 | −1.17 |
+**The short-only books (no long leg) are all negative Sharpe in OOS.**
+The naked short alpha by itself isn't a viable strategy at this universe
+and rebalance frequency — it needs either a long leg (dollar-neutral)
+or a risk control mechanism. The L/S quintile pair-trade carries the
+strategy almost entirely on the long leg's performance in this regime.
 
-Two findings:
+**Adding back a 15 % per-position stop** lifts naive OOS Sharpe from
+0.92 to 3.85 and brings every trained model into positive territory
+— see the [stop-level sensitivity sweep](#stop-level-sensitivity-sweep)
+below for the full table. A previous version of this README had the stop
+on by default. **Stop loss is now off by default; flip it on with one
+CLI flag (`--stop-loss-pct 0.15`) when you want the more impressive
+numbers.**
 
-**1. The ≥ 50 % per-position win-rate IS achieved naked**. `logit` wins
-53.4 % of months, `gbm_rank` 52.5 %, even `naive` is at 50.9 %. The trained
-models genuinely identify cross-sectionally bearish names.
+### Per-position win-rate is still > 50 % — the issue is magnitude
 
-**2. Win-rate alone is not enough — magnitude is the killer.** `logit`'s
-**median** trade is **+1.71 %** (most months win), but its **mean** trade
-is **−0.33 %**. The gap is fat-right-tail squeezes: APX +218 %, 4DX +217 %,
-BRN +177 %, SRL +174 % in a single month. One of those, with a 2.5 % book
-weight, costs ~5 % of NAV in one stroke — wipes out an entire year of
-median-trade gains.
+The headline negative Sharpes for the trained models don't mean the
+models are wrong about *which names to short*. Per-position win-rates
+(share of monthly short positions that ended profitable, i.e. the stock
+actually fell during the month) are at or above 50 % for the trained
+models:
+
+| Model | Per-position win-rate | Mean trade | Median trade | Worst single position |
+|---|---:|---:|---:|---:|
+| **logit** | **53.4 %** | −0.33 % | **+1.71 %** | −218 % (APX 2024-07) |
+| gbm_rank | 52.5 % | −0.87 % | +1.85 % | −218 % (4DX 2025-08) |
+| naive | 50.9 % | 0.00 % | +0.43 % | −177 % (BRN 2024-01) |
+| gbm_cls | 50.8 % | −1.27 % | +0.38 % | −217 % (4DX) |
+| ew | 47.4 % | −0.56 % | −0.50 % | −50 % |
+
+`logit`'s **median** trade is **+1.71 %** (most months win), but its
+**mean** trade is **−0.33 %**. The gap is fat-right-tail squeezes: APX
++218 %, 4DX +217 %, BRN +177 %, SRL +174 % in a single month. One of
+those, with a 2.5 % book weight, costs ~5 % of NAV in one stroke —
+wipes out an entire year of median-trade gains.
 
 This is **structural to short-selling**, not a model defect: a long can
-lose at most 100 %, a short can lose 500 + %. Every short fund uses
-*some* form of risk control. The 15 % stop in this model is the simplest
-version of that. Full data:
+lose at most 100 %, a short can lose 500 + %. Full per-position data:
 [`reports/no_stop_per_model.csv`](reports/no_stop_per_model.csv) /
 [`reports/no_stop.md`](reports/no_stop.md).
 
@@ -163,10 +188,11 @@ out of the short quintile mid-month) we haven't tested yet. Would require
 weekly re-rerunning the model on the ASIC weekly grid; turnover would
 climb materially. Marked as a follow-up.
 
-### Stop-loss is structural, not cosmetic
+### Stop-loss impact (current default = off)
 
-Side-by-side OOS Sharpe with the default 15 % stop vs `--stop-loss-pct 1.0`
-(disabled). Same panel, same costs, same Friday rebalance:
+Side-by-side OOS Sharpe with the stop *disabled* (current default) vs the
+old `--stop-loss-pct 0.15` setting. Same panel, same costs, same Friday
+rebalance. The "with stop" column is one CLI flag away.
 
 | Model | OOS Sharpe (with stop) | OOS Sharpe (no stop) | Δ Sharpe | OOS MaxDD (with) | OOS MaxDD (no) |
 |---|---:|---:|---:|---:|---:|
@@ -304,81 +330,63 @@ fundamentals.
 
 ---
 
-## OOS trade-level analysis — the actual short book
+## OOS trade-level analysis — the actual short book (no stop)
 
 Reconstructed every short position from the OOS holdout (2023-06 → 2026-05,
 **2,089 monthly positions across 224 unique tickers**, model = `logit`),
-applied the same 15 % stop + 100 bps slippage + commission + borrow as the
-headline backtest, and aggregated by ticker. Full per-position table is at
-[`reports/oos_short_positions.csv`](reports/oos_short_positions.csv) and
-the per-ticker summary is at
+**no stop loss applied** — per-position monthly returns are uncapped.
+Full per-position table:
+[`reports/oos_short_positions.csv`](reports/oos_short_positions.csv);
+per-ticker summary:
 [`reports/oos_trades.csv`](reports/oos_trades.csv) /
-[`reports/oos_trades.md`](reports/oos_trades.md). Regenerate via
-`scripts/_oos_trades.py --model logit`.
+[`reports/oos_trades.md`](reports/oos_trades.md).
 
-**Aggregate OOS stats (short leg only):**
-- **Total short-leg cumulative P&L**: ~+95 % of book across 2,089 monthly short positions
-- **Per-position win-rate**: ~55 % (winners are bigger than losers)
-- **Stop-fire rate**: ~17 % of positions clipped at the −16 % floor — 1 in 6
-- **Best single month**: CXL **+49 %** (Calix fell 49 % in one month)
-- **Worst single month**: −16 % (capped by the stop; pre-cap moves were as bad as +60 %, i.e. the stock rallied 60 % against the short)
+**Aggregate OOS stats (short leg only, no stop):**
 
-### Top 10 winning shorts
+- **Total short-leg cumulative P&L**: **−41.8 % of book** across 2,089 monthly positions. The dollar-neutral L/S quintile is still positive (Sharpe 0.92) because the *long leg* carries it.
+- **Per-position win-rate**: 53.4 % — most monthly shorts individually profitable.
+- **Median per-position return**: **+1.91 %** (half the positions made ≥ +1.91 %).
+- **Mean per-position return**: **−0.33 %** — dragged negative by the fat right-tail.
+- **Best single month**: ERA +84 % (Energy Resources of Australia fell 84 % the month it was wound up).
+- **Worst single month**: **4DX −314 %** (4D Medical rallied 314 % in Aug 2025 — a 2.5 %-book-weight short took ~8 % of NAV in one stroke).
+- **42 single positions lost > 50 %**, **161 lost > 25 %** — uncapped squeezes.
 
-`avg_trade_%` is the mean per-position return (positive = stock fell, short won).
-`hit_%` is share of monthly shorts that were profitable.
-`n_stops` is the count of months where the −16 % stop fired.
+### Top 10 winning shorts (no stop)
 
-| # | Ticker | Company | n months shorted | total P&L (% book) | avg trade | best month | hit-rate | n stops | avg SI % | first → last |
-|---:|---|---|---:|---:|---:|---:|---:|---:|---|
-| 1 | CXL | Calix | 30 | **+5.10 %** | +10.8 % | +49.0 % | 67 % | 5 | 2.5 | 2023-06 → 2026-04 |
-| 2 | CCX | City Chic Collective | 17 | +4.05 % | +14.8 % | +60.7 % | 71 % | 1 | 0.6 | 2024-01 → 2026-03 |
-| 3 | ERA | Energy Resources of Australia | 7 | +3.74 % | +33.1 % | +84.4 % | 86 % | 1 | 0.0 | 2024-03 → 2024-09 |
-| 4 | NMT | Neometals | 16 | +3.53 % | +14.0 % | +38.0 % | 81 % | 1 | 1.6 | 2023-06 → 2025-06 |
-| 5 | LOT | Lotus Resources | 16 | +3.37 % | +12.9 % | +57.6 % | 63 % | 2 | 7.2 | 2024-07 → 2026-04 |
-| 6 | CHN | Chalice Mining | 16 | +3.25 % | +13.1 % | +52.9 % | 69 % | 4 | 5.8 | 2023-06 → 2025-06 |
-| 7 | LKE | Lake Resources | 24 | +3.18 % | +8.7 % | +40.0 % | 67 % | 5 | 2.4 | 2023-06 → 2025-12 |
-| 8 | BRN | BrainChip Holdings | 31 | +3.00 % | +6.6 % | +41.5 % | 65 % | 6 | 4.1 | 2023-06 → 2025-12 |
-| 9 | SYR | Syrah Resources | 28 | +2.94 % | +7.0 % | +38.8 % | 64 % | 5 | 10.5 | 2023-06 → 2025-12 |
-| 10 | SGR | Star Entertainment | 21 | +2.93 % | +9.0 % | +41.1 % | 71 % | 1 | 4.4 | 2023-06 → 2026-03 |
+`avg_trade_%` is the mean per-position monthly return (positive = stock fell, short won).
+`worst_%` is **uncapped** — many of these winning shorts took brutal interim squeezes en route to their eventual cumulative profit.
 
-The pattern is recognisable: **cleantech / carbon losers (CXL, CHN), broken
-retail (CCX), wound-up uranium (ERA), lithium / battery deflation (LKE, NMT,
-LOT, SYR), meme deflation (BRN), and the Star Entertainment casino-licence
-collapse (SGR)**. CXL and BRN were each shorted in 30 / 31 of the 36 OOS
-months — basically a permanent short for the period.
+| # | Ticker | Company | n months shorted | total P&L (% book) | avg trade | best month | worst month | hit-rate | avg SI % | first → last |
+|---:|---|---|---:|---:|---:|---:|---:|---:|---:|---|
+| 1 | CCX | City Chic Collective | 17 | **+3.82 %** | +14.0 % | +60.7 % | −30.4 % | 71 % | 0.6 | 2024-01 → 2026-03 |
+| 2 | LOT | Lotus Resources | 16 | +3.19 % | +12.2 % | +57.6 % | −29.0 % | 63 % | 7.2 | 2024-07 → 2026-04 |
+| 3 | NMT | Neometals | 16 | +2.98 % | +11.8 % | +38.0 % | −50.0 % | 81 % | 1.6 | 2023-06 → 2025-06 |
+| 4 | CXL | Calix | 30 | +2.93 % | +6.5 % | +49.0 % | **−70.8 %** | 67 % | 2.5 | 2023-06 → 2026-04 |
+| 5 | GLL | Galilee Energy | 10 | +2.79 % | +17.5 % | +44.7 % | −5.3 % | 70 % | 0.1 | 2024-01 → 2025-02 |
+| 6 | SGR | Star Entertainment | 21 | +2.75 % | +8.5 % | +41.1 % | −26.9 % | 71 % | 4.4 | 2023-06 → 2026-03 |
+| 7 | WBT | Weebit Nano | 18 | +2.38 % | +8.6 % | +36.7 % | −33.7 % | 72 % | 5.1 | 2023-07 → 2026-03 |
+| 8 | ERA | Energy Resources of Australia | 7 | +2.37 % | +21.1 % | +84.4 % | **−100.0 %** | 86 % | 0.0 | 2024-03 → 2024-09 |
+| 9 | CHN | Chalice Mining | 16 | +2.20 % | +8.9 % | +52.9 % | −49.8 % | 69 % | 5.8 | 2023-06 → 2025-06 |
+| 10 | BAP | Bapcor | 6 | +2.16 % | +21.3 % | +62.2 % | −3.3 % | 83 % | 7.3 | 2025-11 → 2026-04 |
 
-### Top 10 losing shorts
+**Even winners had brutal months without the stop:** Calix −71 % in one month, Energy Resources −100 % the month operations terminated, Neometals −50 %. The 15 % stop would have closed those positions before the eventual cumulative profit was realised — a real trade-off, not a free lunch.
 
-`worst month` is capped at −16 % by the stop — without the stop these would
-have been −20 % to −60 %.
+### Top 10 losing shorts (no stop) — the squeezes
 
-| # | Ticker | Company | n months shorted | total P&L (% book) | avg trade | best month | worst month | hit-rate | n stops | avg SI % | first → last |
-|---:|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---|
-| 1 | CAT | Catapult Sports | 13 | **−1.48 %** | −6.1 % | +10.9 % | −16.0 % | 39 % | 2 | 0.8 | 2023-06 → 2025-09 |
-| 2 | TTT | Titomic | 21 | −1.24 % | −2.6 % | +39.5 % | −16.0 % | 43 % | 10 | 0.1 | 2024-01 → 2026-03 |
-| 3 | EVN | Evolution Mining | 15 | −1.15 % | −4.0 % | +18.2 % | −16.0 % | 40 % | 1 | 1.1 | 2023-06 → 2025-11 |
-| 4 | MYS | MyState | 22 | −1.13 % | −2.4 % | +5.5 % | −12.6 % | 27 % | 0 | 0.3 | 2023-06 → 2026-04 |
-| 5 | PDN | Paladin Energy | 19 | −1.12 % | −2.8 % | +37.9 % | −16.0 % | 32 % | 6 | 7.3 | 2023-06 → 2025-09 |
-| 6 | LTR | Liontown Resources | 19 | −1.10 % | −2.5 % | +29.6 % | −16.0 % | 32 % | 5 | 7.4 | 2024-02 → 2026-04 |
-| 7 | EMR | Emerald Resources | 6 | −1.09 % | −9.8 % | +1.0 % | −16.0 % | 17 % | 3 | 2.0 | 2025-07 → 2025-12 |
-| 8 | AEF | Australian Ethical | 8 | −1.01 % | −6.8 % | +6.5 % | −16.0 % | 38 % | 3 | 0.4 | 2023-06 → 2024-04 |
-| 9 | RSG | Resolute Mining | 5 | −0.99 % | −10.8 % | 0.0 % | −16.0 % | 0 % | 2 | 0.4 | 2025-08 → 2025-12 |
-| 10 | WAF | West African Resources | 9 | −0.95 % | −5.5 % | +17.7 % | −16.0 % | 11 % | 3 | 1.1 | 2023-10 → 2025-11 |
+| # | Ticker | Company | n months shorted | total P&L (% book) | avg trade | best month | worst month | hit-rate | avg SI % | first → last |
+|---:|---|---|---:|---:|---:|---:|---:|---:|---:|---|
+| 1 | SRL | Sunrise Resources | 30 | **−9.43 %** | −17.9 % | +37.7 % | **−231.2 %** | 53 % | 1.3 | 2023-06 → 2025-12 |
+| 2 | 4DX | 4D Medical | 20 | **−9.39 %** | −26.7 % | +35.1 % | **−314.0 %** | 50 % | 0.0 | 2023-11 → 2025-12 |
+| 3 | TTT | Titomic | 21 | −5.43 % | −14.7 % | +39.5 % | −124.1 % | 43 % | 0.1 | 2024-01 → 2026-03 |
+| 4 | ASM | Australian Strategic Materials | 28 | −5.11 % | −10.2 % | +36.1 % | −163.9 % | 50 % | 1.7 | 2023-06 → 2025-12 |
+| 5 | APX | Appen | 25 | −3.40 % | −7.7 % | +55.6 % | −127.3 % | 56 % | 3.9 | 2023-06 → 2026-01 |
+| 6 | SPL | Starpharma Holdings | 19 | −3.39 % | −9.7 % | +58.5 % | −172.0 % | 47 % | 0.4 | 2023-06 → 2025-12 |
+| 7 | EOS | Electro Optic Systems | 19 | −3.31 % | −9.6 % | +28.2 % | −118.7 % | 37 % | 1.0 | 2024-07 → 2026-04 |
+| 8 | EGR | EcoGraf | 13 | −2.80 % | −12.4 % | +28.1 % | −139.1 % | 46 % | 0.3 | 2024-01 → 2025-12 |
+| 9 | IXR | Ionic Rare Earths | 26 | −2.78 % | −5.8 % | +40.0 % | −125.0 % | 50 % | 0.1 | 2023-06 → 2026-03 |
+| 10 | CAT | Catapult Sports | 13 | −2.25 % | −9.8 % | +10.9 % | −44.3 % | 39 % | 0.8 | 2023-06 → 2025-09 |
 
-The losers cluster on **gold + uranium + lithium re-rates** the model bet
-against: PDN, LTR, EVN, EMR, RSG, WAF, MIN are all commodity names that
-rallied. CAT (sports tech) and AEF (ethical fund manager) were broken
-narratives that snapped back. **No single name cost the book more than
-−1.5 % of NAV cumulatively** — the −16 % per-position stop kept even
-multi-month conviction-shorts under control.
-
-### What this looks like as a research result
-
-* **2,085 monthly short positions** across 206 names over 36 months — i.e. on average ~58 names shorted at any one time
-* **+101 % of book** in cumulative short-leg P&L over 3 years OOS — that's the gross alpha before the long leg adds anything
-* **The 1-in-6 stop-fire rate proves the stop is structural**, not cosmetic — without it the LTR-style sustained-rally names would each have cost 3-5 × what they did
-* **Winners cluster in the bearish-tail names you'd expect** (broken biotechs, battery losers, broken-thesis tech), losers cluster in **commodity cyclicals the market re-rated** (lithium, uranium, data centres) — both make economic sense
+**Without the stop the worst names cost 6-9 × what they did with the stop on.** SRL and 4DX alone cost −18.8 % of book. The previous (with-stop) version had no single name worse than −1.5 %. Negative `worst_%` values *exceed* −100 % because a 2.5 %-book-weight short of a stock that rallies 300 % loses 300 % of *position notional*. These are exactly the squeezes the user's "shouldn't be shorting it 23 times!" intuition was pointing at — without the stop, the strategy actually does take the full pain of multi-bagger squeezes.
 
 ---
 
@@ -555,7 +563,7 @@ Java-free fallback.
 * **Sector dummies skipped** — FMP `profile` not yet pulled. Easy follow-up.
 * **Borrow cost flat 150 bps p.a.** Real ASX borrow varies by name and
   date; the `CostConfig` is fully parameterised.
-* **Capital-raise / squeeze dynamics absent.** The 15 % stop catches
+* **Capital-raise / squeeze dynamics absent.** The 15 % stop (when enabled) catches
   most single-week pain, but the engine is pure adjusted-close.
 * **Sample limitations.** OOS = 36 months (3 years). That's a strong
   holdout for a 16-year IS panel but still a single regime
