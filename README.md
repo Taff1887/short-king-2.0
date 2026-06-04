@@ -48,6 +48,57 @@ exit-and-re-entry commission. Annualisation factor = 12 (monthly).
 | naive | 0.40 | 0.62 | +10.4 % | −16.1 % |
 | ew | −0.55 | −0.73 | −9.5 % | −33.5 % |
 
+### Stop-level sensitivity sweep
+
+Re-run the production engine at different cumulative-stop thresholds — same
+panel, same Friday rebalance, same costs (25 bps + 1.5 % p.a. borrow +
+5 bps slippage + 100 bps stop-fill slippage), only the floor moves.
+Long-short quintile OOS:
+
+| Stop level | naive Sharpe | naive CAGR | naive MaxDD | logit Sharpe | logit CAGR | gbm_rank Sharpe |
+|---|---:|---:|---:|---:|---:|---:|
+| **Off (`--stop-loss-pct 1.0`)** | 0.92 | +11.2 % | **−10.8 %** | 0.24 | +2.9 % | −0.21 |
+| 20 % | 2.83 | +32.6 % | −4.9 % | 2.16 | +36.0 % | 1.64 |
+| **15 % (current default)** | **3.85** | **+44.9 %** | **−4.2 %** | **2.80** | **+47.1 %** | **2.23** |
+| 12 % | 4.89 | +57.0 % | −3.4 % | 3.35 | +57.2 % | 2.74 |
+| 10 % | 5.79 | +67.8 % | −2.6 % | 3.82 | +65.9 % | 3.15 |
+| 8 % | 6.90 | +81.7 % | −1.8 % | 4.35 | +76.6 % | 3.65 |
+
+**Caveat — the cost model favours tight stops.** The 100 bps stop-fill
+slippage is a constant in the model; in real markets the slippage at a
+8 % trigger is meaningfully worse than at 15 % (because tighter stops
+fire during faster price moves). A more realistic model would scale
+slippage with trigger tightness; 8 % at 200-300 bps slippage is closer
+to the true number. 15 % is a defensible compromise; 12 % is worth
+exploring with better slippage assumptions. Full data:
+[`reports/stop_levels.csv`](reports/stop_levels.csv) /
+[`reports/stop_levels.md`](reports/stop_levels.md).
+
+### Alternative exit protocols (daily intraday + signal-driven)
+
+Beyond the simple cumulative floor, we tested two additional ideas
+(`scripts/_exit_protocols.py`): a **daily intraday rule** (exit if any
+single trading day during the hold rises >10 %) and a **cumulative
+trailing rule** at +10 %. The relative impact on the OOS short book
+(model = `logit`):
+
+| Protocol | Triggers fired | What it catches |
+|---|---:|---|
+| **A: Monthly EOM stop at 15 %** (current default) | 578 cumulative stops | Slow grinds that cross 15 % over the month, no intra-month checks |
+| **B: Daily intraday +10 % single-day** | 453 daily stops | Sudden squeezes / takeover bids that gap up |
+| **C: Cumulative trailing +10 %** | 922 stops | Combines both — fires earlier on grinds AND on spikes |
+| **D: Daily 10 % AND cumulative 10 %** | 369 + 678 = 1,047 stops | First-to-fire; tightest |
+
+The clearest win is **C (tighter cumulative threshold)** — the cumulative
+rule already catches both grinds and spikes, so adding daily intraday on
+top (D) only marginally helps. Pure daily intraday (B) without cumulative
+misses slow grinds entirely and ends up no better than A.
+
+**Signal-driven exits** (the second idea — close early if the score drops
+out of the short quintile mid-month) we haven't tested yet. Would require
+weekly re-rerunning the model on the ASIC weekly grid; turnover would
+climb materially. Marked as a follow-up.
+
 ### Stop-loss is structural, not cosmetic
 
 Side-by-side OOS Sharpe with the default 15 % stop vs `--stop-loss-pct 1.0`

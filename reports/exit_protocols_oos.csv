@@ -1,0 +1,5 @@
+protocol,label,n_positions,avg_days_held,daily_stops,cum_stops,held_to_rebal,stop_fire_rate_%,win_rate_%,OOS_CAGR_%,OOS_Sharpe,OOS_Sortino,OOS_MaxDD_%,n_months
+A_monthly_only,Monthly EOM stop at +15 % cumulative (current default),2089,18.2,0,578,1511,27.7,56.1,-6.64,-0.24,-0.33,-38.91,35
+B_daily_10,Daily intraday: exit if any single day rises >10 %,2089,18.5,453,0,1636,21.7,56.8,-6.93,-0.24,-0.33,-39.39,35
+C_trail_10,Cumulative trailing: exit if stock rises >10 % from entry,2089,15.8,0,922,1167,44.1,60.2,-2.65,-0.07,-0.09,-31.71,35
+D_both_10,Both: daily 10 % AND cumulative 10 % (first-to-fire),2089,15.2,369,678,1042,50.1,61.0,-2.55,-0.06,-0.08,-29.57,35
