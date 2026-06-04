@@ -48,6 +48,70 @@ exit-and-re-entry commission. Annualisation factor = 12 (monthly).
 | naive | 0.40 | 0.62 | +10.4 % | −16.1 % |
 | ew | −0.55 | −0.73 | −9.5 % | −33.5 % |
 
+### What does the model look like with NO stop loss?
+
+A fair question — is the strategy real, or is it just "the stop loss
+masking a broken model"? Re-running the OOS short book with the stop
+disabled gives a clean answer:
+
+| Model | Win-rate (no stop) | Mean trade | Median trade | Worst single position | n positions losing > 50 % | OOS Sharpe (short leg) |
+|---|---:|---:|---:|---:|---:|---:|
+| **logit** | **53.4 %** | −0.33 % | **+1.71 %** | −218 % (APX 2024-07) | 42 | −0.51 |
+| gbm_rank | 52.5 % | −0.87 % | +1.85 % | −218 % (4DX 2025-08) | 71 | −0.63 |
+| naive | 50.9 % | 0.00 % | +0.43 % | −177 % (BRN 2024-01) | 11 | −0.42 |
+| gbm_cls | 50.8 % | −1.27 % | +0.38 % | −217 % (4DX) | 41 | −1.21 |
+| ew | 47.4 % | −0.56 % | −0.50 % | −50 % | 0 | −1.17 |
+
+Two findings:
+
+**1. The ≥ 50 % per-position win-rate IS achieved naked**. `logit` wins
+53.4 % of months, `gbm_rank` 52.5 %, even `naive` is at 50.9 %. The trained
+models genuinely identify cross-sectionally bearish names.
+
+**2. Win-rate alone is not enough — magnitude is the killer.** `logit`'s
+**median** trade is **+1.71 %** (most months win), but its **mean** trade
+is **−0.33 %**. The gap is fat-right-tail squeezes: APX +218 %, 4DX +217 %,
+BRN +177 %, SRL +174 % in a single month. One of those, with a 2.5 % book
+weight, costs ~5 % of NAV in one stroke — wipes out an entire year of
+median-trade gains.
+
+This is **structural to short-selling**, not a model defect: a long can
+lose at most 100 %, a short can lose 500 + %. Every short fund uses
+*some* form of risk control. The 15 % stop in this model is the simplest
+version of that. Full data:
+[`reports/no_stop_per_model.csv`](reports/no_stop_per_model.csv) /
+[`reports/no_stop.md`](reports/no_stop.md).
+
+### Trying to kill the right tail without a stop — momentum filter sweep
+
+The squeezes that killed naked-shorting (APX, 4DX, BRN, SRL) were all
+**already rallying** when we shorted them. A "don't fight the tape"
+filter that drops any name with high 12-week momentum *before* sorting
+into the short quintile is a more elegant version of risk control.
+`scripts/_no_stop_with_mom_filter.py` sweeps the cutoff:
+
+**Count of OOS positions losing > 50 % (lower is better):**
+
+| Mom cutoff | naive | logit | gbm_rank | gbm_cls |
+|---|---:|---:|---:|---:|
+| 1.0 (off) | 11 | 40 | 68 | 39 |
+| 0.9 (drop top 10 % momentum) | 8 | 33 | 50 | 26 |
+| 0.7 (drop top 30 % momentum) | 7 | 26 | 43 | 20 |
+| **0.5** (only short below-median momentum) | **5** | **23** | **38** | **18** |
+
+The filter halves the number of catastrophic single-position losses, but
+**the short leg still has negative Sharpe** at every cutoff for every
+model. Per-position win rate doesn't improve (it actually edges *down*
+slightly because the filter also drops some legitimate winners). Full
+data:
+[`reports/no_stop_mom_filter.csv`](reports/no_stop_mom_filter.csv) /
+[`reports/no_stop_mom_filter.md`](reports/no_stop_mom_filter.md).
+
+**The takeaway**: the model picks the right names (53 % win-rate is a
+real signal, not noise) — but you cannot run a naked-short book on the
+ASX small-mid-cap tail without a tail-risk control. Stop loss, momentum
+filter, vol-scaled position sizes, sector neutrality — pick at least one.
+
 ### Stop-level sensitivity sweep
 
 Re-run the production engine at different cumulative-stop thresholds — same
