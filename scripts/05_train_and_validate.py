@@ -150,13 +150,19 @@ def _walkforward_predict(
     for fold_id, sp in enumerate(splits):
         # Cast feature matrix to plain float64 ndarray — some *_rk columns
         # are pandas extension Float64 (nullable), which breaks np.isfinite
-        # and tree-model native arrays.
-        X_tr = df.iloc[sp.train_idx][feat_cols].astype("float64", copy=False)
-        X_te = df.iloc[sp.test_idx][feat_cols].astype("float64", copy=False)
+        # and tree-model native arrays. Impute NaN to 0.5 (the neutral
+        # cross-sectional rank) so linear models (logit) don't blow up;
+        # tree models (LightGBM) handle NaN natively but the imputation
+        # leaves them just as expressive (a tree can still split on 0.5).
+        # Without this, requiring every feature finite would drop ~98 % of
+        # training rows because at least one *_rk column is NaN for most
+        # name-dates on a 573-column panel.
+        X_tr = df.iloc[sp.train_idx][feat_cols].astype("float64", copy=False).fillna(0.5)
+        X_te = df.iloc[sp.test_idx][feat_cols].astype("float64", copy=False).fillna(0.5)
         y_tr = y.iloc[sp.train_idx]
 
-        # Drop NaN labels from training, leave test predictions unconstrained.
-        tr_mask = y_tr.notna() & np.isfinite(X_tr.to_numpy()).all(axis=1)
+        # Drop NaN labels from training; X is already imputed above.
+        tr_mask = y_tr.notna()
         if int(tr_mask.sum()) == 0:
             logger.warning(f"{model_name}: fold {fold_id} has no usable training rows, skipping")
             continue
@@ -193,17 +199,22 @@ def main() -> int:
         feat_filename = "features_monthly.parquet"
         oof_filename = "oof_predictions_monthly.parquet"
         metrics_filename = "model_metrics_monthly.csv"
-        # Override the defaults only when the user didn't pass an explicit
-        # value (default sentinels are the weekly numbers).
+        # `walk_forward_splits` measures windows in CALENDAR weeks. For a
+        # monthly panel we want 36 months train / 6 months test / 1 month
+        # embargo, which is ~ 156 / 26 / 4 calendar weeks. (Same numbers as
+        # the weekly default for train, which is intentional - 3 years.)
+        # Override only when the user didn't pass an explicit value.
         if args.min_train_weeks == 156:
-            args.min_train_weeks = 36
+            args.min_train_weeks = 156   # 36 months of training data
         if args.test_weeks == 4:
-            args.test_weeks = 6
+            args.test_weeks = 26         # 6-month test windows (~6 monthly dates)
         if args.embargo_weeks == 4:
-            args.embargo_weeks = 1
+            args.embargo_weeks = 4       # 1-month embargo (>= label horizon)
         logger.info(
             "05: --monthly enabled | "
-            f"min_train={args.min_train_weeks}m test={args.test_weeks}m embargo={args.embargo_weeks}m"
+            f"min_train={args.min_train_weeks}w (~36m) "
+            f"test={args.test_weeks}w (~6m) "
+            f"embargo={args.embargo_weeks}w (~1m)"
         )
     else:
         feat_filename = "features.parquet"
@@ -232,7 +243,9 @@ def main() -> int:
     # holdout - that holdout Sharpe is the unbiased OOS estimate.
     dates_unique = pd.to_datetime(df[_DATE_COL].unique())
     holdout_n = int(args.holdout_months)
-    if holdout_n > 0 and len(dates_unique) > holdout_n + (args.min_train_weeks or 12):
+    # Need at least the holdout period + a token training window (12 obs).
+    # holdout_n is in months (or rows of the monthly panel - same thing).
+    if holdout_n > 0 and len(dates_unique) > holdout_n + 12:
         holdout_start = pd.to_datetime(sorted(dates_unique)[-holdout_n])
         is_mask = df[_DATE_COL] < holdout_start
         oos_mask = ~is_mask
@@ -293,12 +306,13 @@ def main() -> int:
         full = pd.Series(np.nan, index=df.index, name="score", dtype="float64")
         full.loc[is_mask] = cv_score_is.to_numpy()
         if holdout_start is not None and int(oos_mask.sum()) > 0:
-            # Fit final model on the FULL IS panel (drop NaN labels + features).
-            X_full_is = df_is[feat_cols].astype("float64", copy=False)
-            keep = y_full.loc[is_mask].notna() & np.isfinite(X_full_is.to_numpy()).all(axis=1)
+            # Fit final model on the FULL IS panel. Impute NaN features to
+            # 0.5 (neutral rank) - same convention as the per-fold driver.
+            X_full_is = df_is[feat_cols].astype("float64", copy=False).fillna(0.5)
+            keep = y_full.loc[is_mask].notna()
             train_idx_is = np.where(keep.to_numpy())[0]
             try:
-                X_te_oos = df.loc[oos_mask, feat_cols].astype("float64", copy=False)
+                X_te_oos = df.loc[oos_mask, feat_cols].astype("float64", copy=False).fillna(0.5)
                 oos_score = fit_predict(
                     X_full_is.loc[keep].reset_index(drop=True),
                     y_full.loc[is_mask].loc[keep].reset_index(drop=True),
@@ -473,9 +487,10 @@ def main() -> int:
 
     # --- Interpretability: full-sample GBM for SHAP / gain importance --------
     logger.info("interpret: fitting full-sample GBM classifier for SHAP / gain importance")
-    # Cast to plain float64 (same nullable-Float64 reason as the walk-forward loop).
-    _X_all = df[feat_cols].astype("float64", copy=False)
-    train_mask = y_bin.notna() & np.isfinite(_X_all.to_numpy()).all(axis=1)
+    # Cast to plain float64 and impute NaN -> 0.5 (same convention as the
+    # walk-forward driver; tree models tolerate either, linear models need it).
+    _X_all = df[feat_cols].astype("float64", copy=False).fillna(0.5)
+    train_mask = y_bin.notna()
     if int(train_mask.sum()) == 0:
         logger.warning("no usable rows for full-sample GBM; skipping interpret artefacts")
     else:

@@ -16,6 +16,7 @@ import pandas as pd
 
 from short_king.data.fmp_client import FMPClient
 from short_king.data.prices import fetch_many_adjusted, fetch_many_market_cap
+from short_king.data.yahoo_xcheck import fetch_many_yahoo_adjusted
 from short_king.utils.config import settings
 from short_king.utils.io import read_parquet, write_parquet
 from short_king.utils.logging import logger
@@ -33,6 +34,12 @@ def _parse_args() -> argparse.Namespace:
                    help="Ignore FMP JSON cache and re-fetch.")
     p.add_argument("--limit-symbols", type=int, default=None,
                    help="Cap on symbols (dev / smoke).")
+    p.add_argument("--price-source", choices=("yahoo", "fmp"), default="yahoo",
+                   help="Primary price source. FMP only ships ~5 years of ASX daily "
+                        "data per call on the current plan, so 'yahoo' is default and "
+                        "is what unlocks the full 16-year ASIC window. The Yahoo "
+                        "cross-check (yahoo_crosscheck.csv) shows median monthly-return "
+                        "correlation of 0.9996 vs FMP in the overlap window.")
     return p.parse_args()
 
 
@@ -60,7 +67,12 @@ def main() -> int:
     logger.info(f"03_pull_fmp_prices: {len(symbols)} symbols | window {start} -> {end}")
 
     client = FMPClient(force_refresh=args.force_refresh)
-    prices = fetch_many_adjusted(symbols, start=start, end=end, client=client)
+    if args.price_source == "yahoo":
+        logger.info(f"price-source=yahoo (16-year history; FMP only has ~5y on this plan)")
+        prices = fetch_many_yahoo_adjusted(symbols, start=start, end=end)
+    else:
+        logger.info("price-source=fmp")
+        prices = fetch_many_adjusted(symbols, start=start, end=end, client=client)
     if prices.empty:
         logger.error("Prices fetch returned zero rows - aborting.")
         return 1

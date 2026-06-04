@@ -237,8 +237,46 @@ def _flag(stats: dict) -> str:
     return "mismatch"
 
 
+def fetch_many_yahoo_adjusted(
+    symbols: list[str],
+    *,
+    start: str | None = None,
+    end: str | None = None,
+) -> pd.DataFrame:
+    """Bulk Yahoo Finance dividend-adjusted price fetch, stacked long.
+
+    Returns ``[symbol, date, adjClose, volume]`` keyed identically to the
+    long FMP price panel so the assemble step can swap sources transparently.
+    Used as the primary price source for the 16-year ASIC window because FMP
+    on the current plan only ships ~5 years of ASX daily history per call.
+    """
+    frames: list[pd.DataFrame] = []
+    n = len(symbols)
+    for i, sym in enumerate(symbols, 1):
+        try:
+            yh = fetch_yahoo_prices(sym, start=start, end=end)
+        except Exception as e:  # noqa: BLE001
+            logger.warning(f"yh {sym}: {e}")
+            yh = pd.DataFrame(columns=["date", "close"])
+        if not yh.empty:
+            yh = yh.rename(columns={"close": "adjClose"})
+            yh["symbol"] = sym
+            yh["volume"] = pd.NA  # yfinance volume isn't preserved through Adj Close path
+            frames.append(yh[["symbol", "date", "adjClose", "volume"]])
+        if i % 50 == 0:
+            logger.info(f"yh prices: {i}/{n} symbols")
+    if not frames:
+        return pd.DataFrame(columns=["symbol", "date", "adjClose", "volume"])
+    out = pd.concat(frames, ignore_index=True)
+    return (
+        out.sort_values(["symbol", "date"])
+           .reset_index(drop=True)
+    )
+
+
 __all__ = [
     "fetch_yahoo_prices",
+    "fetch_many_yahoo_adjusted",
     "crosscheck_monthly_returns",
     "batch_crosscheck",
 ]

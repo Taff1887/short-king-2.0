@@ -1,0 +1,748 @@
+﻿uv : [32m18:12:15[0m | [1mINFO   [0m | [36m__main__[0m:[36mmain[0m - [1m05: --monthly enabled | 
+min_train=156w (~36m) test=26w (~6m) embargo=4w (~1m)[0m
+At line:1 char:55
++ ... -king-2.0"; uv run python scripts/05_train_and_validate.py --monthly  ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: ([32m18:12:15[...go=4w (~1m)[0m:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+[32m18:12:15[0m | [1mINFO   [0m | [36m__main__[0m:[36mmain[0m - [1m05_train_and_validate: start 
+2026-06-04T18:12:15[0m
+[32m18:12:16[0m | [1mINFO   [0m | [36m__main__[0m:[36mmain[0m - [1musing forward-return column: fwd_ret_4w[0m
+[32m18:12:16[0m | [1mINFO   [0m | [36m__main__[0m:[36mmain[0m - [1mIS/OOS split: holdout_start=2023-06-26 | 
+IS rows=48,910 (2010-06-28 -> 2023-05-29) | OOS rows=11,493 (2023-06-26 -> 2026-05-25)[0m
+[32m18:12:16[0m | [1mINFO   [0m | [36m__main__[0m:[36mmain[0m - [1mmodel inputs: 573 *_rk + 0 sec_* = 573 
+cols[0m
+[32m18:12:16[0m | [1mINFO   [0m | [36m__main__[0m:[36mmain[0m - [1mmodel: naive_si_rank (no fit; pure 
+cross-sectional rank)[0m
+[32m18:12:16[0m | [1mINFO   [0m | [36m__main__[0m:[36mmain[0m - [1mmodel: ew_composite (no fit; equal-weight 
+blend over 12 *_rk cols)[0m
+[32m18:12:16[0m | [1mINFO   [0m | [36m__main__[0m:[36mmain[0m - [1mmodel: logit (walk-forward)[0m
+[32m18:12:16[0m | [1mINFO   [0m | [36mshort_king.models.walk_forward[0m:[36mwalk_forward_splits[0m - 
+[1mwalk_forward: 20 folds | dates [2010-06-28 .. 2023-05-29] | min_train=156w test=26w embargo=4w step=26w[0m
+C:\Users\Taffy Jackson\short-king-2.0\scripts\05_train_and_validate.py:160: Pandas4Warning: The copy keyword is 
+deprecated and will be removed in a future version. Copy-on-Write is active in pandas since 3.0 which utilizes a lazy 
+copy mechanism that defers copies until necessary. Use .copy() to make an eager copy if necessary.
+  X_tr = df.iloc[sp.train_idx][feat_cols].astype("float64", copy=False).fillna(0.5)
+C:\Users\Taffy Jackson\short-king-2.0\scripts\05_train_and_validate.py:161: Pandas4Warning: The copy keyword is 
+deprecated and will be removed in a future version. Copy-on-Write is active in pandas since 3.0 which utilizes a lazy 
+copy mechanism that defers copies until necessary. Use .copy() to make an eager copy if necessary.
+  X_te = df.iloc[sp.test_idx][feat_cols].astype("float64", copy=False).fillna(0.5)
+[32m18:12:16[0m | [33m[1mWARNING[0m | [36m__main__[0m:[36m_walkforward_predict[0m - [33m[1mlogit (IS CV): 
+fold 0 has no usable training rows, skipping[0m
+C:\Users\Taffy Jackson\short-king-2.0\scripts\05_train_and_validate.py:160: Pandas4Warning: The copy keyword is 
+deprecated and will be removed in a future version. Copy-on-Write is active in pandas since 3.0 which utilizes a lazy 
+copy mechanism that defers copies until necessary. Use .copy() to make an eager copy if necessary.
+  X_tr = df.iloc[sp.train_idx][feat_cols].astype("float64", copy=False).fillna(0.5)
+C:\Users\Taffy Jackson\short-king-2.0\scripts\05_train_and_validate.py:161: Pandas4Warning: The copy keyword is 
+deprecated and will be removed in a future version. Copy-on-Write is active in pandas since 3.0 which utilizes a lazy 
+copy mechanism that defers copies until necessary. Use .copy() to make an eager copy if necessary.
+  X_te = df.iloc[sp.test_idx][feat_cols].astype("float64", copy=False).fillna(0.5)
+[32m18:12:16[0m | [33m[1mWARNING[0m | [36m__main__[0m:[36m_walkforward_predict[0m - [33m[1mlogit (IS CV): 
+fold 1 has no usable training rows, skipping[0m
+C:\Users\Taffy Jackson\short-king-2.0\scripts\05_train_and_validate.py:160: Pandas4Warning: The copy keyword is 
+deprecated and will be removed in a future version. Copy-on-Write is active in pandas since 3.0 which utilizes a lazy 
+copy mechanism that defers copies until necessary. Use .copy() to make an eager copy if necessary.
+  X_tr = df.iloc[sp.train_idx][feat_cols].astype("float64", copy=False).fillna(0.5)
+C:\Users\Taffy Jackson\short-king-2.0\scripts\05_train_and_validate.py:161: Pandas4Warning: The copy keyword is 
+deprecated and will be removed in a future version. Copy-on-Write is active in pandas since 3.0 which utilizes a lazy 
+copy mechanism that defers copies until necessary. Use .copy() to make an eager copy if necessary.
+  X_te = df.iloc[sp.test_idx][feat_cols].astype("float64", copy=False).fillna(0.5)
+[32m18:12:16[0m | [33m[1mWARNING[0m | [36m__main__[0m:[36m_walkforward_predict[0m - [33m[1mlogit (IS CV): 
+fold 2 has no usable training rows, skipping[0m
+C:\Users\Taffy Jackson\short-king-2.0\scripts\05_train_and_validate.py:160: Pandas4Warning: The copy keyword is 
+deprecated and will be removed in a future version. Copy-on-Write is active in pandas since 3.0 which utilizes a lazy 
+copy mechanism that defers copies until necessary. Use .copy() to make an eager copy if necessary.
+  X_tr = df.iloc[sp.train_idx][feat_cols].astype("float64", copy=False).fillna(0.5)
+C:\Users\Taffy Jackson\short-king-2.0\scripts\05_train_and_validate.py:161: Pandas4Warning: The copy keyword is 
+deprecated and will be removed in a future version. Copy-on-Write is active in pandas since 3.0 which utilizes a lazy 
+copy mechanism that defers copies until necessary. Use .copy() to make an eager copy if necessary.
+  X_te = df.iloc[sp.test_idx][feat_cols].astype("float64", copy=False).fillna(0.5)
+[32m18:12:16[0m | [33m[1mWARNING[0m | [36m__main__[0m:[36m_walkforward_predict[0m - [33m[1mlogit (IS CV): 
+fold 3 has no usable training rows, skipping[0m
+C:\Users\Taffy Jackson\short-king-2.0\scripts\05_train_and_validate.py:160: Pandas4Warning: The copy keyword is 
+deprecated and will be removed in a future version. Copy-on-Write is active in pandas since 3.0 which utilizes a lazy 
+copy mechanism that defers copies until necessary. Use .copy() to make an eager copy if necessary.
+  X_tr = df.iloc[sp.train_idx][feat_cols].astype("float64", copy=False).fillna(0.5)
+C:\Users\Taffy Jackson\short-king-2.0\scripts\05_train_and_validate.py:161: Pandas4Warning: The copy keyword is 
+deprecated and will be removed in a future version. Copy-on-Write is active in pandas since 3.0 which utilizes a lazy 
+copy mechanism that defers copies until necessary. Use .copy() to make an eager copy if necessary.
+  X_te = df.iloc[sp.test_idx][feat_cols].astype("float64", copy=False).fillna(0.5)
+[32m18:12:16[0m | [33m[1mWARNING[0m | [36m__main__[0m:[36m_walkforward_predict[0m - [33m[1mlogit (IS CV): 
+fold 4 has no usable training rows, skipping[0m
+C:\Users\Taffy Jackson\short-king-2.0\scripts\05_train_and_validate.py:160: Pandas4Warning: The copy keyword is 
+deprecated and will be removed in a future version. Copy-on-Write is active in pandas since 3.0 which utilizes a lazy 
+copy mechanism that defers copies until necessary. Use .copy() to make an eager copy if necessary.
+  X_tr = df.iloc[sp.train_idx][feat_cols].astype("float64", copy=False).fillna(0.5)
+C:\Users\Taffy Jackson\short-king-2.0\scripts\05_train_and_validate.py:161: Pandas4Warning: The copy keyword is 
+deprecated and will be removed in a future version. Copy-on-Write is active in pandas since 3.0 which utilizes a lazy 
+copy mechanism that defers copies until necessary. Use .copy() to make an eager copy if necessary.
+  X_te = df.iloc[sp.test_idx][feat_cols].astype("float64", copy=False).fillna(0.5)
+[32m18:12:16[0m | [33m[1mWARNING[0m | [36m__main__[0m:[36m_walkforward_predict[0m - [33m[1mlogit (IS CV): 
+fold 5 has no usable training rows, skipping[0m
+C:\Users\Taffy Jackson\short-king-2.0\scripts\05_train_and_validate.py:160: Pandas4Warning: The copy keyword is 
+deprecated and will be removed in a future version. Copy-on-Write is active in pandas since 3.0 which utilizes a lazy 
+copy mechanism that defers copies until necessary. Use .copy() to make an eager copy if necessary.
+  X_tr = df.iloc[sp.train_idx][feat_cols].astype("float64", copy=False).fillna(0.5)
+C:\Users\Taffy Jackson\short-king-2.0\scripts\05_train_and_validate.py:161: Pandas4Warning: The copy keyword is 
+deprecated and will be removed in a future version. Copy-on-Write is active in pandas since 3.0 which utilizes a lazy 
+copy mechanism that defers copies until necessary. Use .copy() to make an eager copy if necessary.
+  X_te = df.iloc[sp.test_idx][feat_cols].astype("float64", copy=False).fillna(0.5)
+[32m18:12:16[0m | [33m[1mWARNING[0m | [36m__main__[0m:[36m_walkforward_predict[0m - [33m[1mlogit (IS CV): 
+fold 6 has no usable training rows, skipping[0m
+C:\Users\Taffy Jackson\short-king-2.0\scripts\05_train_and_validate.py:160: Pandas4Warning: The copy keyword is 
+deprecated and will be removed in a future version. Copy-on-Write is active in pandas since 3.0 which utilizes a lazy 
+copy mechanism that defers copies until necessary. Use .copy() to make an eager copy if necessary.
+  X_tr = df.iloc[sp.train_idx][feat_cols].astype("float64", copy=False).fillna(0.5)
+C:\Users\Taffy Jackson\short-king-2.0\scripts\05_train_and_validate.py:161: Pandas4Warning: The copy keyword is 
+deprecated and will be removed in a future version. Copy-on-Write is active in pandas since 3.0 which utilizes a lazy 
+copy mechanism that defers copies until necessary. Use .copy() to make an eager copy if necessary.
+  X_te = df.iloc[sp.test_idx][feat_cols].astype("float64", copy=False).fillna(0.5)
+[32m18:12:16[0m | [33m[1mWARNING[0m | [36m__main__[0m:[36m_walkforward_predict[0m - [33m[1mlogit (IS CV): 
+fold 7 has no usable training rows, skipping[0m
+C:\Users\Taffy Jackson\short-king-2.0\scripts\05_train_and_validate.py:160: Pandas4Warning: The copy keyword is 
+deprecated and will be removed in a future version. Copy-on-Write is active in pandas since 3.0 which utilizes a lazy 
+copy mechanism that defers copies until necessary. Use .copy() to make an eager copy if necessary.
+  X_tr = df.iloc[sp.train_idx][feat_cols].astype("float64", copy=False).fillna(0.5)
+C:\Users\Taffy Jackson\short-king-2.0\scripts\05_train_and_validate.py:161: Pandas4Warning: The copy keyword is 
+deprecated and will be removed in a future version. Copy-on-Write is active in pandas since 3.0 which utilizes a lazy 
+copy mechanism that defers copies until necessary. Use .copy() to make an eager copy if necessary.
+  X_te = df.iloc[sp.test_idx][feat_cols].astype("float64", copy=False).fillna(0.5)
+[32m18:12:17[0m | [33m[1mWARNING[0m | [36m__main__[0m:[36m_walkforward_predict[0m - [33m[1mlogit (IS CV): 
+fold 8 has no usable training rows, skipping[0m
+C:\Users\Taffy Jackson\short-king-2.0\scripts\05_train_and_validate.py:160: Pandas4Warning: The copy keyword is 
+deprecated and will be removed in a future version. Copy-on-Write is active in pandas since 3.0 which utilizes a lazy 
+copy mechanism that defers copies until necessary. Use .copy() to make an eager copy if necessary.
+  X_tr = df.iloc[sp.train_idx][feat_cols].astype("float64", copy=False).fillna(0.5)
+C:\Users\Taffy Jackson\short-king-2.0\scripts\05_train_and_validate.py:161: Pandas4Warning: The copy keyword is 
+deprecated and will be removed in a future version. Copy-on-Write is active in pandas since 3.0 which utilizes a lazy 
+copy mechanism that defers copies until necessary. Use .copy() to make an eager copy if necessary.
+  X_te = df.iloc[sp.test_idx][feat_cols].astype("float64", copy=False).fillna(0.5)
+[32m18:12:17[0m | [33m[1mWARNING[0m | [36m__main__[0m:[36m_walkforward_predict[0m - [33m[1mlogit (IS CV): 
+fold 9 has no usable training rows, skipping[0m
+C:\Users\Taffy Jackson\short-king-2.0\scripts\05_train_and_validate.py:160: Pandas4Warning: The copy keyword is 
+deprecated and will be removed in a future version. Copy-on-Write is active in pandas since 3.0 which utilizes a lazy 
+copy mechanism that defers copies until necessary. Use .copy() to make an eager copy if necessary.
+  X_tr = df.iloc[sp.train_idx][feat_cols].astype("float64", copy=False).fillna(0.5)
+C:\Users\Taffy Jackson\short-king-2.0\scripts\05_train_and_validate.py:161: Pandas4Warning: The copy keyword is 
+deprecated and will be removed in a future version. Copy-on-Write is active in pandas since 3.0 which utilizes a lazy 
+copy mechanism that defers copies until necessary. Use .copy() to make an eager copy if necessary.
+  X_te = df.iloc[sp.test_idx][feat_cols].astype("float64", copy=False).fillna(0.5)
+[32m18:12:17[0m | [33m[1mWARNING[0m | [36m__main__[0m:[36m_walkforward_predict[0m - [33m[1mlogit (IS CV): 
+fold 10 has no usable training rows, skipping[0m
+C:\Users\Taffy Jackson\short-king-2.0\scripts\05_train_and_validate.py:160: Pandas4Warning: The copy keyword is 
+deprecated and will be removed in a future version. Copy-on-Write is active in pandas since 3.0 which utilizes a lazy 
+copy mechanism that defers copies until necessary. Use .copy() to make an eager copy if necessary.
+  X_tr = df.iloc[sp.train_idx][feat_cols].astype("float64", copy=False).fillna(0.5)
+C:\Users\Taffy Jackson\short-king-2.0\scripts\05_train_and_validate.py:161: Pandas4Warning: The copy keyword is 
+deprecated and will be removed in a future version. Copy-on-Write is active in pandas since 3.0 which utilizes a lazy 
+copy mechanism that defers copies until necessary. Use .copy() to make an eager copy if necessary.
+  X_te = df.iloc[sp.test_idx][feat_cols].astype("float64", copy=False).fillna(0.5)
+[32m18:12:17[0m | [33m[1mWARNING[0m | [36m__main__[0m:[36m_walkforward_predict[0m - [33m[1mlogit (IS CV): 
+fold 11 has no usable training rows, skipping[0m
+C:\Users\Taffy Jackson\short-king-2.0\scripts\05_train_and_validate.py:160: Pandas4Warning: The copy keyword is 
+deprecated and will be removed in a future version. Copy-on-Write is active in pandas since 3.0 which utilizes a lazy 
+copy mechanism that defers copies until necessary. Use .copy() to make an eager copy if necessary.
+  X_tr = df.iloc[sp.train_idx][feat_cols].astype("float64", copy=False).fillna(0.5)
+C:\Users\Taffy Jackson\short-king-2.0\scripts\05_train_and_validate.py:161: Pandas4Warning: The copy keyword is 
+deprecated and will be removed in a future version. Copy-on-Write is active in pandas since 3.0 which utilizes a lazy 
+copy mechanism that defers copies until necessary. Use .copy() to make an eager copy if necessary.
+  X_te = df.iloc[sp.test_idx][feat_cols].astype("float64", copy=False).fillna(0.5)
+[32m18:12:17[0m | [33m[1mWARNING[0m | [36m__main__[0m:[36m_walkforward_predict[0m - [33m[1mlogit (IS CV): 
+fold 12 has no usable training rows, skipping[0m
+C:\Users\Taffy Jackson\short-king-2.0\scripts\05_train_and_validate.py:160: Pandas4Warning: The copy keyword is 
+deprecated and will be removed in a future version. Copy-on-Write is active in pandas since 3.0 which utilizes a lazy 
+copy mechanism that defers copies until necessary. Use .copy() to make an eager copy if necessary.
+  X_tr = df.iloc[sp.train_idx][feat_cols].astype("float64", copy=False).fillna(0.5)
+C:\Users\Taffy Jackson\short-king-2.0\scripts\05_train_and_validate.py:161: Pandas4Warning: The copy keyword is 
+deprecated and will be removed in a future version. Copy-on-Write is active in pandas since 3.0 which utilizes a lazy 
+copy mechanism that defers copies until necessary. Use .copy() to make an eager copy if necessary.
+  X_te = df.iloc[sp.test_idx][feat_cols].astype("float64", copy=False).fillna(0.5)
+[32m18:12:17[0m | [33m[1mWARNING[0m | [36m__main__[0m:[36m_walkforward_predict[0m - [33m[1mlogit (IS CV): 
+fold 13 has no usable training rows, skipping[0m
+C:\Users\Taffy Jackson\short-king-2.0\scripts\05_train_and_validate.py:160: Pandas4Warning: The copy keyword is 
+deprecated and will be removed in a future version. Copy-on-Write is active in pandas since 3.0 which utilizes a lazy 
+copy mechanism that defers copies until necessary. Use .copy() to make an eager copy if necessary.
+  X_tr = df.iloc[sp.train_idx][feat_cols].astype("float64", copy=False).fillna(0.5)
+C:\Users\Taffy Jackson\short-king-2.0\scripts\05_train_and_validate.py:161: Pandas4Warning: The copy keyword is 
+deprecated and will be removed in a future version. Copy-on-Write is active in pandas since 3.0 which utilizes a lazy 
+copy mechanism that defers copies until necessary. Use .copy() to make an eager copy if necessary.
+  X_te = df.iloc[sp.test_idx][feat_cols].astype("float64", copy=False).fillna(0.5)
+[32m18:12:17[0m | [33m[1mWARNING[0m | [36m__main__[0m:[36m_walkforward_predict[0m - [33m[1mlogit (IS CV): 
+fold 14 has no usable training rows, skipping[0m
+C:\Users\Taffy Jackson\short-king-2.0\scripts\05_train_and_validate.py:160: Pandas4Warning: The copy keyword is 
+deprecated and will be removed in a future version. Copy-on-Write is active in pandas since 3.0 which utilizes a lazy 
+copy mechanism that defers copies until necessary. Use .copy() to make an eager copy if necessary.
+  X_tr = df.iloc[sp.train_idx][feat_cols].astype("float64", copy=False).fillna(0.5)
+C:\Users\Taffy Jackson\short-king-2.0\scripts\05_train_and_validate.py:161: Pandas4Warning: The copy keyword is 
+deprecated and will be removed in a future version. Copy-on-Write is active in pandas since 3.0 which utilizes a lazy 
+copy mechanism that defers copies until necessary. Use .copy() to make an eager copy if necessary.
+  X_te = df.iloc[sp.test_idx][feat_cols].astype("float64", copy=False).fillna(0.5)
+[32m18:12:18[0m | [33m[1mWARNING[0m | [36m__main__[0m:[36m_walkforward_predict[0m - [33m[1mlogit (IS CV): 
+fold 15 has no usable training rows, skipping[0m
+C:\Users\Taffy Jackson\short-king-2.0\scripts\05_train_and_validate.py:160: Pandas4Warning: The copy keyword is 
+deprecated and will be removed in a future version. Copy-on-Write is active in pandas since 3.0 which utilizes a lazy 
+copy mechanism that defers copies until necessary. Use .copy() to make an eager copy if necessary.
+  X_tr = df.iloc[sp.train_idx][feat_cols].astype("float64", copy=False).fillna(0.5)
+C:\Users\Taffy Jackson\short-king-2.0\scripts\05_train_and_validate.py:161: Pandas4Warning: The copy keyword is 
+deprecated and will be removed in a future version. Copy-on-Write is active in pandas since 3.0 which utilizes a lazy 
+copy mechanism that defers copies until necessary. Use .copy() to make an eager copy if necessary.
+  X_te = df.iloc[sp.test_idx][feat_cols].astype("float64", copy=False).fillna(0.5)
+[32m18:12:18[0m | [33m[1mWARNING[0m | [36m__main__[0m:[36m_walkforward_predict[0m - [33m[1mlogit (IS CV): 
+fold 16 has no usable training rows, skipping[0m
+C:\Users\Taffy Jackson\short-king-2.0\scripts\05_train_and_validate.py:160: Pandas4Warning: The copy keyword is 
+deprecated and will be removed in a future version. Copy-on-Write is active in pandas since 3.0 which utilizes a lazy 
+copy mechanism that defers copies until necessary. Use .copy() to make an eager copy if necessary.
+  X_tr = df.iloc[sp.train_idx][feat_cols].astype("float64", copy=False).fillna(0.5)
+C:\Users\Taffy Jackson\short-king-2.0\scripts\05_train_and_validate.py:161: Pandas4Warning: The copy keyword is 
+deprecated and will be removed in a future version. Copy-on-Write is active in pandas since 3.0 which utilizes a lazy 
+copy mechanism that defers copies until necessary. Use .copy() to make an eager copy if necessary.
+  X_te = df.iloc[sp.test_idx][feat_cols].astype("float64", copy=False).fillna(0.5)
+C:\Users\Taffy Jackson\short-king-2.0\.venv\Lib\site-packages\sklearn\linear_model\_logistic.py:1403: FutureWarning: 
+'penalty' was deprecated in version 1.8 and will be removed in 1.10. To avoid this warning, leave 'penalty' set to its 
+default value and use 'l1_ratio' or 'C' instead. Use l1_ratio=0 instead of penalty='l2', l1_ratio=1 instead of 
+penalty='l1', l1_ratio set to a float between 0 and 1 instead of penalty='elasticnet', and C=np.inf instead of 
+penalty=None.
+  warnings.warn(
+[32m18:12:18[0m | [1mINFO   [0m | [36mshort_king.models.baselines[0m:[36mfit_logit_baseline[0m - 
+[1mfit_logit_baseline: trained on 2119 rows x 573 features (C=1.0, class_weight=balanced)[0m
+[32m18:12:23[0m | [33m[1mWARNING[0m | [36mshort_king.models.baselines[0m:[36m_write_statsmodels_summary[0m - 
+[33m[1mbaselines: statsmodels Logit fit failed (Singular matrix); skipping summary[0m
+[32m18:12:23[0m | [1mINFO   [0m | [36m__main__[0m:[36m_walkforward_predict[0m - [1mlogit (IS CV): fold 17 
+train n=2119 [2010-06-28..2021-12-12] -> test n=2219 [2022-01-10..2022-07-10][0m
+C:\Users\Taffy Jackson\short-king-2.0\scripts\05_train_and_validate.py:160: Pandas4Warning: The copy keyword is 
+deprecated and will be removed in a future version. Copy-on-Write is active in pandas since 3.0 which utilizes a lazy 
+copy mechanism that defers copies until necessary. Use .copy() to make an eager copy if necessary.
+  X_tr = df.iloc[sp.train_idx][feat_cols].astype("float64", copy=False).fillna(0.5)
+C:\Users\Taffy Jackson\short-king-2.0\scripts\05_train_and_validate.py:161: Pandas4Warning: The copy keyword is 
+deprecated and will be removed in a future version. Copy-on-Write is active in pandas since 3.0 which utilizes a lazy 
+copy mechanism that defers copies until necessary. Use .copy() to make an eager copy if necessary.
+  X_te = df.iloc[sp.test_idx][feat_cols].astype("float64", copy=False).fillna(0.5)
+C:\Users\Taffy Jackson\short-king-2.0\.venv\Lib\site-packages\sklearn\linear_model\_logistic.py:1403: FutureWarning: 
+'penalty' was deprecated in version 1.8 and will be removed in 1.10. To avoid this warning, leave 'penalty' set to its 
+default value and use 'l1_ratio' or 'C' instead. Use l1_ratio=0 instead of penalty='l2', l1_ratio=1 instead of 
+penalty='l1', l1_ratio set to a float between 0 and 1 instead of penalty='elasticnet', and C=np.inf instead of 
+penalty=None.
+  warnings.warn(
+[32m18:12:23[0m | [1mINFO   [0m | [36mshort_king.models.baselines[0m:[36mfit_logit_baseline[0m - 
+[1mfit_logit_baseline: trained on 4245 rows x 573 features (C=1.0, class_weight=balanced)[0m
+[32m18:12:26[0m | [33m[1mWARNING[0m | [36mshort_king.models.baselines[0m:[36m_write_statsmodels_summary[0m - 
+[33m[1mbaselines: statsmodels Logit fit failed (Singular matrix); skipping summary[0m
+[32m18:12:26[0m | [1mINFO   [0m | [36m__main__[0m:[36m_walkforward_predict[0m - [1mlogit (IS CV): fold 18 
+train n=4245 [2010-06-28..2022-06-12] -> test n=2207 [2022-07-11..2023-01-08][0m
+C:\Users\Taffy Jackson\short-king-2.0\scripts\05_train_and_validate.py:160: Pandas4Warning: The copy keyword is 
+deprecated and will be removed in a future version. Copy-on-Write is active in pandas since 3.0 which utilizes a lazy 
+copy mechanism that defers copies until necessary. Use .copy() to make an eager copy if necessary.
+  X_tr = df.iloc[sp.train_idx][feat_cols].astype("float64", copy=False).fillna(0.5)
+C:\Users\Taffy Jackson\short-king-2.0\scripts\05_train_and_validate.py:161: Pandas4Warning: The copy keyword is 
+deprecated and will be removed in a future version. Copy-on-Write is active in pandas since 3.0 which utilizes a lazy 
+copy mechanism that defers copies until necessary. Use .copy() to make an eager copy if necessary.
+  X_te = df.iloc[sp.test_idx][feat_cols].astype("float64", copy=False).fillna(0.5)
+C:\Users\Taffy Jackson\short-king-2.0\.venv\Lib\site-packages\sklearn\linear_model\_logistic.py:1403: FutureWarning: 
+'penalty' was deprecated in version 1.8 and will be removed in 1.10. To avoid this warning, leave 'penalty' set to its 
+default value and use 'l1_ratio' or 'C' instead. Use l1_ratio=0 instead of penalty='l2', l1_ratio=1 instead of 
+penalty='l1', l1_ratio set to a float between 0 and 1 instead of penalty='elasticnet', and C=np.inf instead of 
+penalty=None.
+  warnings.warn(
+[32m18:12:26[0m | [1mINFO   [0m | [36mshort_king.models.baselines[0m:[36mfit_logit_baseline[0m - 
+[1mfit_logit_baseline: trained on 6398 rows x 573 features (C=1.0, class_weight=balanced)[0m
+[32m18:12:27[0m | [33m[1mWARNING[0m | [36mshort_king.models.baselines[0m:[36m_write_statsmodels_summary[0m - 
+[33m[1mbaselines: statsmodels Logit fit failed (Singular matrix); skipping summary[0m
+[32m18:12:27[0m | [1mINFO   [0m | [36m__main__[0m:[36m_walkforward_predict[0m - [1mlogit (IS CV): fold 19 
+train n=6398 [2010-06-28..2022-12-11] -> test n=1801 [2023-01-09..2023-05-29][0m
+C:\Users\Taffy Jackson\short-king-2.0\scripts\05_train_and_validate.py:311: Pandas4Warning: The copy keyword is 
+deprecated and will be removed in a future version. Copy-on-Write is active in pandas since 3.0 which utilizes a lazy 
+copy mechanism that defers copies until necessary. Use .copy() to make an eager copy if necessary.
+  X_full_is = df_is[feat_cols].astype("float64", copy=False).fillna(0.5)
+C:\Users\Taffy Jackson\short-king-2.0\scripts\05_train_and_validate.py:315: Pandas4Warning: The copy keyword is 
+deprecated and will be removed in a future version. Copy-on-Write is active in pandas since 3.0 which utilizes a lazy 
+copy mechanism that defers copies until necessary. Use .copy() to make an eager copy if necessary.
+  X_te_oos = df.loc[oos_mask, feat_cols].astype("float64", copy=False).fillna(0.5)
+C:\Users\Taffy Jackson\short-king-2.0\.venv\Lib\site-packages\sklearn\linear_model\_logistic.py:1403: FutureWarning: 
+'penalty' was deprecated in version 1.8 and will be removed in 1.10. To avoid this warning, leave 'penalty' set to its 
+default value and use 'l1_ratio' or 'C' instead. Use l1_ratio=0 instead of penalty='l2', l1_ratio=1 instead of 
+penalty='l1', l1_ratio set to a float between 0 and 1 instead of penalty='elasticnet', and C=np.inf instead of 
+penalty=None.
+  warnings.warn(
+[32m18:12:28[0m | [1mINFO   [0m | [36mshort_king.models.baselines[0m:[36mfit_logit_baseline[0m - 
+[1mfit_logit_baseline: trained on 8550 rows x 573 features (C=1.0, class_weight=balanced)[0m
+[32m18:12:31[0m | [33m[1mWARNING[0m | [36mshort_king.models.baselines[0m:[36m_write_statsmodels_summary[0m - 
+[33m[1mbaselines: statsmodels Logit fit failed (Singular matrix); skipping summary[0m
+[32m18:12:31[0m | [1mINFO   [0m | [36m__main__[0m:[36mmain[0m - [1mmodel: gbm_cls (walk-forward)[0m
+[32m18:12:31[0m | [1mINFO   [0m | [36mshort_king.models.walk_forward[0m:[36mwalk_forward_splits[0m - 
+[1mwalk_forward: 20 folds | dates [2010-06-28 .. 2023-05-29] | min_train=156w test=26w embargo=4w step=26w[0m
+C:\Users\Taffy Jackson\short-king-2.0\scripts\05_train_and_validate.py:160: Pandas4Warning: The copy keyword is 
+deprecated and will be removed in a future version. Copy-on-Write is active in pandas since 3.0 which utilizes a lazy 
+copy mechanism that defers copies until necessary. Use .copy() to make an eager copy if necessary.
+  X_tr = df.iloc[sp.train_idx][feat_cols].astype("float64", copy=False).fillna(0.5)
+C:\Users\Taffy Jackson\short-king-2.0\scripts\05_train_and_validate.py:161: Pandas4Warning: The copy keyword is 
+deprecated and will be removed in a future version. Copy-on-Write is active in pandas since 3.0 which utilizes a lazy 
+copy mechanism that defers copies until necessary. Use .copy() to make an eager copy if necessary.
+  X_te = df.iloc[sp.test_idx][feat_cols].astype("float64", copy=False).fillna(0.5)
+[32m18:12:31[0m | [33m[1mWARNING[0m | [36m__main__[0m:[36m_walkforward_predict[0m - [33m[1mgbm_cls (IS CV): 
+fold 0 has no usable training rows, skipping[0m
+C:\Users\Taffy Jackson\short-king-2.0\scripts\05_train_and_validate.py:160: Pandas4Warning: The copy keyword is 
+deprecated and will be removed in a future version. Copy-on-Write is active in pandas since 3.0 which utilizes a lazy 
+copy mechanism that defers copies until necessary. Use .copy() to make an eager copy if necessary.
+  X_tr = df.iloc[sp.train_idx][feat_cols].astype("float64", copy=False).fillna(0.5)
+C:\Users\Taffy Jackson\short-king-2.0\scripts\05_train_and_validate.py:161: Pandas4Warning: The copy keyword is 
+deprecated and will be removed in a future version. Copy-on-Write is active in pandas since 3.0 which utilizes a lazy 
+copy mechanism that defers copies until necessary. Use .copy() to make an eager copy if necessary.
+  X_te = df.iloc[sp.test_idx][feat_cols].astype("float64", copy=False).fillna(0.5)
+[32m18:12:31[0m | [33m[1mWARNING[0m | [36m__main__[0m:[36m_walkforward_predict[0m - [33m[1mgbm_cls (IS CV): 
+fold 1 has no usable training rows, skipping[0m
+C:\Users\Taffy Jackson\short-king-2.0\scripts\05_train_and_validate.py:160: Pandas4Warning: The copy keyword is 
+deprecated and will be removed in a future version. Copy-on-Write is active in pandas since 3.0 which utilizes a lazy 
+copy mechanism that defers copies until necessary. Use .copy() to make an eager copy if necessary.
+  X_tr = df.iloc[sp.train_idx][feat_cols].astype("float64", copy=False).fillna(0.5)
+C:\Users\Taffy Jackson\short-king-2.0\scripts\05_train_and_validate.py:161: Pandas4Warning: The copy keyword is 
+deprecated and will be removed in a future version. Copy-on-Write is active in pandas since 3.0 which utilizes a lazy 
+copy mechanism that defers copies until necessary. Use .copy() to make an eager copy if necessary.
+  X_te = df.iloc[sp.test_idx][feat_cols].astype("float64", copy=False).fillna(0.5)
+[32m18:12:31[0m | [33m[1mWARNING[0m | [36m__main__[0m:[36m_walkforward_predict[0m - [33m[1mgbm_cls (IS CV): 
+fold 2 has no usable training rows, skipping[0m
+C:\Users\Taffy Jackson\short-king-2.0\scripts\05_train_and_validate.py:160: Pandas4Warning: The copy keyword is 
+deprecated and will be removed in a future version. Copy-on-Write is active in pandas since 3.0 which utilizes a lazy 
+copy mechanism that defers copies until necessary. Use .copy() to make an eager copy if necessary.
+  X_tr = df.iloc[sp.train_idx][feat_cols].astype("float64", copy=False).fillna(0.5)
+C:\Users\Taffy Jackson\short-king-2.0\scripts\05_train_and_validate.py:161: Pandas4Warning: The copy keyword is 
+deprecated and will be removed in a future version. Copy-on-Write is active in pandas since 3.0 which utilizes a lazy 
+copy mechanism that defers copies until necessary. Use .copy() to make an eager copy if necessary.
+  X_te = df.iloc[sp.test_idx][feat_cols].astype("float64", copy=False).fillna(0.5)
+[32m18:12:31[0m | [33m[1mWARNING[0m | [36m__main__[0m:[36m_walkforward_predict[0m - [33m[1mgbm_cls (IS CV): 
+fold 3 has no usable training rows, skipping[0m
+C:\Users\Taffy Jackson\short-king-2.0\scripts\05_train_and_validate.py:160: Pandas4Warning: The copy keyword is 
+deprecated and will be removed in a future version. Copy-on-Write is active in pandas since 3.0 which utilizes a lazy 
+copy mechanism that defers copies until necessary. Use .copy() to make an eager copy if necessary.
+  X_tr = df.iloc[sp.train_idx][feat_cols].astype("float64", copy=False).fillna(0.5)
+C:\Users\Taffy Jackson\short-king-2.0\scripts\05_train_and_validate.py:161: Pandas4Warning: The copy keyword is 
+deprecated and will be removed in a future version. Copy-on-Write is active in pandas since 3.0 which utilizes a lazy 
+copy mechanism that defers copies until necessary. Use .copy() to make an eager copy if necessary.
+  X_te = df.iloc[sp.test_idx][feat_cols].astype("float64", copy=False).fillna(0.5)
+[32m18:12:31[0m | [33m[1mWARNING[0m | [36m__main__[0m:[36m_walkforward_predict[0m - [33m[1mgbm_cls (IS CV): 
+fold 4 has no usable training rows, skipping[0m
+C:\Users\Taffy Jackson\short-king-2.0\scripts\05_train_and_validate.py:160: Pandas4Warning: The copy keyword is 
+deprecated and will be removed in a future version. Copy-on-Write is active in pandas since 3.0 which utilizes a lazy 
+copy mechanism that defers copies until necessary. Use .copy() to make an eager copy if necessary.
+  X_tr = df.iloc[sp.train_idx][feat_cols].astype("float64", copy=False).fillna(0.5)
+C:\Users\Taffy Jackson\short-king-2.0\scripts\05_train_and_validate.py:161: Pandas4Warning: The copy keyword is 
+deprecated and will be removed in a future version. Copy-on-Write is active in pandas since 3.0 which utilizes a lazy 
+copy mechanism that defers copies until necessary. Use .copy() to make an eager copy if necessary.
+  X_te = df.iloc[sp.test_idx][feat_cols].astype("float64", copy=False).fillna(0.5)
+[32m18:12:31[0m | [33m[1mWARNING[0m | [36m__main__[0m:[36m_walkforward_predict[0m - [33m[1mgbm_cls (IS CV): 
+fold 5 has no usable training rows, skipping[0m
+C:\Users\Taffy Jackson\short-king-2.0\scripts\05_train_and_validate.py:160: Pandas4Warning: The copy keyword is 
+deprecated and will be removed in a future version. Copy-on-Write is active in pandas since 3.0 which utilizes a lazy 
+copy mechanism that defers copies until necessary. Use .copy() to make an eager copy if necessary.
+  X_tr = df.iloc[sp.train_idx][feat_cols].astype("float64", copy=False).fillna(0.5)
+C:\Users\Taffy Jackson\short-king-2.0\scripts\05_train_and_validate.py:161: Pandas4Warning: The copy keyword is 
+deprecated and will be removed in a future version. Copy-on-Write is active in pandas since 3.0 which utilizes a lazy 
+copy mechanism that defers copies until necessary. Use .copy() to make an eager copy if necessary.
+  X_te = df.iloc[sp.test_idx][feat_cols].astype("float64", copy=False).fillna(0.5)
+[32m18:12:31[0m | [33m[1mWARNING[0m | [36m__main__[0m:[36m_walkforward_predict[0m - [33m[1mgbm_cls (IS CV): 
+fold 6 has no usable training rows, skipping[0m
+C:\Users\Taffy Jackson\short-king-2.0\scripts\05_train_and_validate.py:160: Pandas4Warning: The copy keyword is 
+deprecated and will be removed in a future version. Copy-on-Write is active in pandas since 3.0 which utilizes a lazy 
+copy mechanism that defers copies until necessary. Use .copy() to make an eager copy if necessary.
+  X_tr = df.iloc[sp.train_idx][feat_cols].astype("float64", copy=False).fillna(0.5)
+C:\Users\Taffy Jackson\short-king-2.0\scripts\05_train_and_validate.py:161: Pandas4Warning: The copy keyword is 
+deprecated and will be removed in a future version. Copy-on-Write is active in pandas since 3.0 which utilizes a lazy 
+copy mechanism that defers copies until necessary. Use .copy() to make an eager copy if necessary.
+  X_te = df.iloc[sp.test_idx][feat_cols].astype("float64", copy=False).fillna(0.5)
+[32m18:12:31[0m | [33m[1mWARNING[0m | [36m__main__[0m:[36m_walkforward_predict[0m - [33m[1mgbm_cls (IS CV): 
+fold 7 has no usable training rows, skipping[0m
+C:\Users\Taffy Jackson\short-king-2.0\scripts\05_train_and_validate.py:160: Pandas4Warning: The copy keyword is 
+deprecated and will be removed in a future version. Copy-on-Write is active in pandas since 3.0 which utilizes a lazy 
+copy mechanism that defers copies until necessary. Use .copy() to make an eager copy if necessary.
+  X_tr = df.iloc[sp.train_idx][feat_cols].astype("float64", copy=False).fillna(0.5)
+C:\Users\Taffy Jackson\short-king-2.0\scripts\05_train_and_validate.py:161: Pandas4Warning: The copy keyword is 
+deprecated and will be removed in a future version. Copy-on-Write is active in pandas since 3.0 which utilizes a lazy 
+copy mechanism that defers copies until necessary. Use .copy() to make an eager copy if necessary.
+  X_te = df.iloc[sp.test_idx][feat_cols].astype("float64", copy=False).fillna(0.5)
+[32m18:12:32[0m | [33m[1mWARNING[0m | [36m__main__[0m:[36m_walkforward_predict[0m - [33m[1mgbm_cls (IS CV): 
+fold 8 has no usable training rows, skipping[0m
+C:\Users\Taffy Jackson\short-king-2.0\scripts\05_train_and_validate.py:160: Pandas4Warning: The copy keyword is 
+deprecated and will be removed in a future version. Copy-on-Write is active in pandas since 3.0 which utilizes a lazy 
+copy mechanism that defers copies until necessary. Use .copy() to make an eager copy if necessary.
+  X_tr = df.iloc[sp.train_idx][feat_cols].astype("float64", copy=False).fillna(0.5)
+C:\Users\Taffy Jackson\short-king-2.0\scripts\05_train_and_validate.py:161: Pandas4Warning: The copy keyword is 
+deprecated and will be removed in a future version. Copy-on-Write is active in pandas since 3.0 which utilizes a lazy 
+copy mechanism that defers copies until necessary. Use .copy() to make an eager copy if necessary.
+  X_te = df.iloc[sp.test_idx][feat_cols].astype("float64", copy=False).fillna(0.5)
+[32m18:12:32[0m | [33m[1mWARNING[0m | [36m__main__[0m:[36m_walkforward_predict[0m - [33m[1mgbm_cls (IS CV): 
+fold 9 has no usable training rows, skipping[0m
+C:\Users\Taffy Jackson\short-king-2.0\scripts\05_train_and_validate.py:160: Pandas4Warning: The copy keyword is 
+deprecated and will be removed in a future version. Copy-on-Write is active in pandas since 3.0 which utilizes a lazy 
+copy mechanism that defers copies until necessary. Use .copy() to make an eager copy if necessary.
+  X_tr = df.iloc[sp.train_idx][feat_cols].astype("float64", copy=False).fillna(0.5)
+C:\Users\Taffy Jackson\short-king-2.0\scripts\05_train_and_validate.py:161: Pandas4Warning: The copy keyword is 
+deprecated and will be removed in a future version. Copy-on-Write is active in pandas since 3.0 which utilizes a lazy 
+copy mechanism that defers copies until necessary. Use .copy() to make an eager copy if necessary.
+  X_te = df.iloc[sp.test_idx][feat_cols].astype("float64", copy=False).fillna(0.5)
+[32m18:12:32[0m | [33m[1mWARNING[0m | [36m__main__[0m:[36m_walkforward_predict[0m - [33m[1mgbm_cls (IS CV): 
+fold 10 has no usable training rows, skipping[0m
+C:\Users\Taffy Jackson\short-king-2.0\scripts\05_train_and_validate.py:160: Pandas4Warning: The copy keyword is 
+deprecated and will be removed in a future version. Copy-on-Write is active in pandas since 3.0 which utilizes a lazy 
+copy mechanism that defers copies until necessary. Use .copy() to make an eager copy if necessary.
+  X_tr = df.iloc[sp.train_idx][feat_cols].astype("float64", copy=False).fillna(0.5)
+C:\Users\Taffy Jackson\short-king-2.0\scripts\05_train_and_validate.py:161: Pandas4Warning: The copy keyword is 
+deprecated and will be removed in a future version. Copy-on-Write is active in pandas since 3.0 which utilizes a lazy 
+copy mechanism that defers copies until necessary. Use .copy() to make an eager copy if necessary.
+  X_te = df.iloc[sp.test_idx][feat_cols].astype("float64", copy=False).fillna(0.5)
+[32m18:12:32[0m | [33m[1mWARNING[0m | [36m__main__[0m:[36m_walkforward_predict[0m - [33m[1mgbm_cls (IS CV): 
+fold 11 has no usable training rows, skipping[0m
+C:\Users\Taffy Jackson\short-king-2.0\scripts\05_train_and_validate.py:160: Pandas4Warning: The copy keyword is 
+deprecated and will be removed in a future version. Copy-on-Write is active in pandas since 3.0 which utilizes a lazy 
+copy mechanism that defers copies until necessary. Use .copy() to make an eager copy if necessary.
+  X_tr = df.iloc[sp.train_idx][feat_cols].astype("float64", copy=False).fillna(0.5)
+C:\Users\Taffy Jackson\short-king-2.0\scripts\05_train_and_validate.py:161: Pandas4Warning: The copy keyword is 
+deprecated and will be removed in a future version. Copy-on-Write is active in pandas since 3.0 which utilizes a lazy 
+copy mechanism that defers copies until necessary. Use .copy() to make an eager copy if necessary.
+  X_te = df.iloc[sp.test_idx][feat_cols].astype("float64", copy=False).fillna(0.5)
+[32m18:12:32[0m | [33m[1mWARNING[0m | [36m__main__[0m:[36m_walkforward_predict[0m - [33m[1mgbm_cls (IS CV): 
+fold 12 has no usable training rows, skipping[0m
+C:\Users\Taffy Jackson\short-king-2.0\scripts\05_train_and_validate.py:160: Pandas4Warning: The copy keyword is 
+deprecated and will be removed in a future version. Copy-on-Write is active in pandas since 3.0 which utilizes a lazy 
+copy mechanism that defers copies until necessary. Use .copy() to make an eager copy if necessary.
+  X_tr = df.iloc[sp.train_idx][feat_cols].astype("float64", copy=False).fillna(0.5)
+C:\Users\Taffy Jackson\short-king-2.0\scripts\05_train_and_validate.py:161: Pandas4Warning: The copy keyword is 
+deprecated and will be removed in a future version. Copy-on-Write is active in pandas since 3.0 which utilizes a lazy 
+copy mechanism that defers copies until necessary. Use .copy() to make an eager copy if necessary.
+  X_te = df.iloc[sp.test_idx][feat_cols].astype("float64", copy=False).fillna(0.5)
+[32m18:12:32[0m | [33m[1mWARNING[0m | [36m__main__[0m:[36m_walkforward_predict[0m - [33m[1mgbm_cls (IS CV): 
+fold 13 has no usable training rows, skipping[0m
+C:\Users\Taffy Jackson\short-king-2.0\scripts\05_train_and_validate.py:160: Pandas4Warning: The copy keyword is 
+deprecated and will be removed in a future version. Copy-on-Write is active in pandas since 3.0 which utilizes a lazy 
+copy mechanism that defers copies until necessary. Use .copy() to make an eager copy if necessary.
+  X_tr = df.iloc[sp.train_idx][feat_cols].astype("float64", copy=False).fillna(0.5)
+C:\Users\Taffy Jackson\short-king-2.0\scripts\05_train_and_validate.py:161: Pandas4Warning: The copy keyword is 
+deprecated and will be removed in a future version. Copy-on-Write is active in pandas since 3.0 which utilizes a lazy 
+copy mechanism that defers copies until necessary. Use .copy() to make an eager copy if necessary.
+  X_te = df.iloc[sp.test_idx][feat_cols].astype("float64", copy=False).fillna(0.5)
+[32m18:12:32[0m | [33m[1mWARNING[0m | [36m__main__[0m:[36m_walkforward_predict[0m - [33m[1mgbm_cls (IS CV): 
+fold 14 has no usable training rows, skipping[0m
+C:\Users\Taffy Jackson\short-king-2.0\scripts\05_train_and_validate.py:160: Pandas4Warning: The copy keyword is 
+deprecated and will be removed in a future version. Copy-on-Write is active in pandas since 3.0 which utilizes a lazy 
+copy mechanism that defers copies until necessary. Use .copy() to make an eager copy if necessary.
+  X_tr = df.iloc[sp.train_idx][feat_cols].astype("float64", copy=False).fillna(0.5)
+C:\Users\Taffy Jackson\short-king-2.0\scripts\05_train_and_validate.py:161: Pandas4Warning: The copy keyword is 
+deprecated and will be removed in a future version. Copy-on-Write is active in pandas since 3.0 which utilizes a lazy 
+copy mechanism that defers copies until necessary. Use .copy() to make an eager copy if necessary.
+  X_te = df.iloc[sp.test_idx][feat_cols].astype("float64", copy=False).fillna(0.5)
+[32m18:12:32[0m | [33m[1mWARNING[0m | [36m__main__[0m:[36m_walkforward_predict[0m - [33m[1mgbm_cls (IS CV): 
+fold 15 has no usable training rows, skipping[0m
+C:\Users\Taffy Jackson\short-king-2.0\scripts\05_train_and_validate.py:160: Pandas4Warning: The copy keyword is 
+deprecated and will be removed in a future version. Copy-on-Write is active in pandas since 3.0 which utilizes a lazy 
+copy mechanism that defers copies until necessary. Use .copy() to make an eager copy if necessary.
+  X_tr = df.iloc[sp.train_idx][feat_cols].astype("float64", copy=False).fillna(0.5)
+C:\Users\Taffy Jackson\short-king-2.0\scripts\05_train_and_validate.py:161: Pandas4Warning: The copy keyword is 
+deprecated and will be removed in a future version. Copy-on-Write is active in pandas since 3.0 which utilizes a lazy 
+copy mechanism that defers copies until necessary. Use .copy() to make an eager copy if necessary.
+  X_te = df.iloc[sp.test_idx][feat_cols].astype("float64", copy=False).fillna(0.5)
+[32m18:12:33[0m | [33m[1mWARNING[0m | [36m__main__[0m:[36m_walkforward_predict[0m - [33m[1mgbm_cls (IS CV): 
+fold 16 has no usable training rows, skipping[0m
+C:\Users\Taffy Jackson\short-king-2.0\scripts\05_train_and_validate.py:160: Pandas4Warning: The copy keyword is 
+deprecated and will be removed in a future version. Copy-on-Write is active in pandas since 3.0 which utilizes a lazy 
+copy mechanism that defers copies until necessary. Use .copy() to make an eager copy if necessary.
+  X_tr = df.iloc[sp.train_idx][feat_cols].astype("float64", copy=False).fillna(0.5)
+C:\Users\Taffy Jackson\short-king-2.0\scripts\05_train_and_validate.py:161: Pandas4Warning: The copy keyword is 
+deprecated and will be removed in a future version. Copy-on-Write is active in pandas since 3.0 which utilizes a lazy 
+copy mechanism that defers copies until necessary. Use .copy() to make an eager copy if necessary.
+  X_te = df.iloc[sp.test_idx][feat_cols].astype("float64", copy=False).fillna(0.5)
+[32m18:12:33[0m | [1mINFO   [0m | [36mshort_king.models.ml[0m:[36mfit_gbm_classifier[0m - 
+[1mfit_gbm_classifier: rows=2,119 features=573 pos_rate=0.450 early_stop=None[0m
+[32m18:12:33[0m | [1mINFO   [0m | [36m__main__[0m:[36m_walkforward_predict[0m - [1mgbm_cls (IS CV): fold 17 
+train n=2119 [2010-06-28..2021-12-12] -> test n=2219 [2022-01-10..2022-07-10][0m
+C:\Users\Taffy Jackson\short-king-2.0\scripts\05_train_and_validate.py:160: Pandas4Warning: The copy keyword is 
+deprecated and will be removed in a future version. Copy-on-Write is active in pandas since 3.0 which utilizes a lazy 
+copy mechanism that defers copies until necessary. Use .copy() to make an eager copy if necessary.
+  X_tr = df.iloc[sp.train_idx][feat_cols].astype("float64", copy=False).fillna(0.5)
+C:\Users\Taffy Jackson\short-king-2.0\scripts\05_train_and_validate.py:161: Pandas4Warning: The copy keyword is 
+deprecated and will be removed in a future version. Copy-on-Write is active in pandas since 3.0 which utilizes a lazy 
+copy mechanism that defers copies until necessary. Use .copy() to make an eager copy if necessary.
+  X_te = df.iloc[sp.test_idx][feat_cols].astype("float64", copy=False).fillna(0.5)
+[32m18:12:33[0m | [1mINFO   [0m | [36mshort_king.models.ml[0m:[36mfit_gbm_classifier[0m - 
+[1mfit_gbm_classifier: rows=4,245 features=573 pos_rate=0.526 early_stop=None[0m
+[32m18:12:34[0m | [1mINFO   [0m | [36m__main__[0m:[36m_walkforward_predict[0m - [1mgbm_cls (IS CV): fold 18 
+train n=4245 [2010-06-28..2022-06-12] -> test n=2207 [2022-07-11..2023-01-08][0m
+C:\Users\Taffy Jackson\short-king-2.0\scripts\05_train_and_validate.py:160: Pandas4Warning: The copy keyword is 
+deprecated and will be removed in a future version. Copy-on-Write is active in pandas since 3.0 which utilizes a lazy 
+copy mechanism that defers copies until necessary. Use .copy() to make an eager copy if necessary.
+  X_tr = df.iloc[sp.train_idx][feat_cols].astype("float64", copy=False).fillna(0.5)
+C:\Users\Taffy Jackson\short-king-2.0\scripts\05_train_and_validate.py:161: Pandas4Warning: The copy keyword is 
+deprecated and will be removed in a future version. Copy-on-Write is active in pandas since 3.0 which utilizes a lazy 
+copy mechanism that defers copies until necessary. Use .copy() to make an eager copy if necessary.
+  X_te = df.iloc[sp.test_idx][feat_cols].astype("float64", copy=False).fillna(0.5)
+[32m18:12:34[0m | [1mINFO   [0m | [36mshort_king.models.ml[0m:[36mfit_gbm_classifier[0m - 
+[1mfit_gbm_classifier: rows=6,398 features=573 pos_rate=0.504 early_stop=None[0m
+[32m18:12:35[0m | [1mINFO   [0m | [36m__main__[0m:[36m_walkforward_predict[0m - [1mgbm_cls (IS CV): fold 19 
+train n=6398 [2010-06-28..2022-12-11] -> test n=1801 [2023-01-09..2023-05-29][0m
+C:\Users\Taffy Jackson\short-king-2.0\scripts\05_train_and_validate.py:311: Pandas4Warning: The copy keyword is 
+deprecated and will be removed in a future version. Copy-on-Write is active in pandas since 3.0 which utilizes a lazy 
+copy mechanism that defers copies until necessary. Use .copy() to make an eager copy if necessary.
+  X_full_is = df_is[feat_cols].astype("float64", copy=False).fillna(0.5)
+C:\Users\Taffy Jackson\short-king-2.0\scripts\05_train_and_validate.py:315: Pandas4Warning: The copy keyword is 
+deprecated and will be removed in a future version. Copy-on-Write is active in pandas since 3.0 which utilizes a lazy 
+copy mechanism that defers copies until necessary. Use .copy() to make an eager copy if necessary.
+  X_te_oos = df.loc[oos_mask, feat_cols].astype("float64", copy=False).fillna(0.5)
+[32m18:12:35[0m | [1mINFO   [0m | [36mshort_king.models.ml[0m:[36mfit_gbm_classifier[0m - 
+[1mfit_gbm_classifier: rows=8,550 features=573 pos_rate=0.507 early_stop=None[0m
+[32m18:12:37[0m | [1mINFO   [0m | [36m__main__[0m:[36mmain[0m - [1mmodel: gbm_rank (walk-forward)[0m
+[32m18:12:37[0m | [1mINFO   [0m | [36mshort_king.models.walk_forward[0m:[36mwalk_forward_splits[0m - 
+[1mwalk_forward: 20 folds | dates [2010-06-28 .. 2023-05-29] | min_train=156w test=26w embargo=4w step=26w[0m
+C:\Users\Taffy Jackson\short-king-2.0\scripts\05_train_and_validate.py:160: Pandas4Warning: The copy keyword is 
+deprecated and will be removed in a future version. Copy-on-Write is active in pandas since 3.0 which utilizes a lazy 
+copy mechanism that defers copies until necessary. Use .copy() to make an eager copy if necessary.
+  X_tr = df.iloc[sp.train_idx][feat_cols].astype("float64", copy=False).fillna(0.5)
+C:\Users\Taffy Jackson\short-king-2.0\scripts\05_train_and_validate.py:161: Pandas4Warning: The copy keyword is 
+deprecated and will be removed in a future version. Copy-on-Write is active in pandas since 3.0 which utilizes a lazy 
+copy mechanism that defers copies until necessary. Use .copy() to make an eager copy if necessary.
+  X_te = df.iloc[sp.test_idx][feat_cols].astype("float64", copy=False).fillna(0.5)
+[32m18:12:37[0m | [33m[1mWARNING[0m | [36m__main__[0m:[36m_walkforward_predict[0m - [33m[1mgbm_rank (IS 
+CV): fold 0 has no usable training rows, skipping[0m
+C:\Users\Taffy Jackson\short-king-2.0\scripts\05_train_and_validate.py:160: Pandas4Warning: The copy keyword is 
+deprecated and will be removed in a future version. Copy-on-Write is active in pandas since 3.0 which utilizes a lazy 
+copy mechanism that defers copies until necessary. Use .copy() to make an eager copy if necessary.
+  X_tr = df.iloc[sp.train_idx][feat_cols].astype("float64", copy=False).fillna(0.5)
+C:\Users\Taffy Jackson\short-king-2.0\scripts\05_train_and_validate.py:161: Pandas4Warning: The copy keyword is 
+deprecated and will be removed in a future version. Copy-on-Write is active in pandas since 3.0 which utilizes a lazy 
+copy mechanism that defers copies until necessary. Use .copy() to make an eager copy if necessary.
+  X_te = df.iloc[sp.test_idx][feat_cols].astype("float64", copy=False).fillna(0.5)
+[32m18:12:37[0m | [33m[1mWARNING[0m | [36m__main__[0m:[36m_walkforward_predict[0m - [33m[1mgbm_rank (IS 
+CV): fold 1 has no usable training rows, skipping[0m
+C:\Users\Taffy Jackson\short-king-2.0\scripts\05_train_and_validate.py:160: Pandas4Warning: The copy keyword is 
+deprecated and will be removed in a future version. Copy-on-Write is active in pandas since 3.0 which utilizes a lazy 
+copy mechanism that defers copies until necessary. Use .copy() to make an eager copy if necessary.
+  X_tr = df.iloc[sp.train_idx][feat_cols].astype("float64", copy=False).fillna(0.5)
+C:\Users\Taffy Jackson\short-king-2.0\scripts\05_train_and_validate.py:161: Pandas4Warning: The copy keyword is 
+deprecated and will be removed in a future version. Copy-on-Write is active in pandas since 3.0 which utilizes a lazy 
+copy mechanism that defers copies until necessary. Use .copy() to make an eager copy if necessary.
+  X_te = df.iloc[sp.test_idx][feat_cols].astype("float64", copy=False).fillna(0.5)
+[32m18:12:37[0m | [33m[1mWARNING[0m | [36m__main__[0m:[36m_walkforward_predict[0m - [33m[1mgbm_rank (IS 
+CV): fold 2 has no usable training rows, skipping[0m
+C:\Users\Taffy Jackson\short-king-2.0\scripts\05_train_and_validate.py:160: Pandas4Warning: The copy keyword is 
+deprecated and will be removed in a future version. Copy-on-Write is active in pandas since 3.0 which utilizes a lazy 
+copy mechanism that defers copies until necessary. Use .copy() to make an eager copy if necessary.
+  X_tr = df.iloc[sp.train_idx][feat_cols].astype("float64", copy=False).fillna(0.5)
+C:\Users\Taffy Jackson\short-king-2.0\scripts\05_train_and_validate.py:161: Pandas4Warning: The copy keyword is 
+deprecated and will be removed in a future version. Copy-on-Write is active in pandas since 3.0 which utilizes a lazy 
+copy mechanism that defers copies until necessary. Use .copy() to make an eager copy if necessary.
+  X_te = df.iloc[sp.test_idx][feat_cols].astype("float64", copy=False).fillna(0.5)
+[32m18:12:37[0m | [33m[1mWARNING[0m | [36m__main__[0m:[36m_walkforward_predict[0m - [33m[1mgbm_rank (IS 
+CV): fold 3 has no usable training rows, skipping[0m
+C:\Users\Taffy Jackson\short-king-2.0\scripts\05_train_and_validate.py:160: Pandas4Warning: The copy keyword is 
+deprecated and will be removed in a future version. Copy-on-Write is active in pandas since 3.0 which utilizes a lazy 
+copy mechanism that defers copies until necessary. Use .copy() to make an eager copy if necessary.
+  X_tr = df.iloc[sp.train_idx][feat_cols].astype("float64", copy=False).fillna(0.5)
+C:\Users\Taffy Jackson\short-king-2.0\scripts\05_train_and_validate.py:161: Pandas4Warning: The copy keyword is 
+deprecated and will be removed in a future version. Copy-on-Write is active in pandas since 3.0 which utilizes a lazy 
+copy mechanism that defers copies until necessary. Use .copy() to make an eager copy if necessary.
+  X_te = df.iloc[sp.test_idx][feat_cols].astype("float64", copy=False).fillna(0.5)
+[32m18:12:37[0m | [33m[1mWARNING[0m | [36m__main__[0m:[36m_walkforward_predict[0m - [33m[1mgbm_rank (IS 
+CV): fold 4 has no usable training rows, skipping[0m
+C:\Users\Taffy Jackson\short-king-2.0\scripts\05_train_and_validate.py:160: Pandas4Warning: The copy keyword is 
+deprecated and will be removed in a future version. Copy-on-Write is active in pandas since 3.0 which utilizes a lazy 
+copy mechanism that defers copies until necessary. Use .copy() to make an eager copy if necessary.
+  X_tr = df.iloc[sp.train_idx][feat_cols].astype("float64", copy=False).fillna(0.5)
+C:\Users\Taffy Jackson\short-king-2.0\scripts\05_train_and_validate.py:161: Pandas4Warning: The copy keyword is 
+deprecated and will be removed in a future version. Copy-on-Write is active in pandas since 3.0 which utilizes a lazy 
+copy mechanism that defers copies until necessary. Use .copy() to make an eager copy if necessary.
+  X_te = df.iloc[sp.test_idx][feat_cols].astype("float64", copy=False).fillna(0.5)
+[32m18:12:37[0m | [33m[1mWARNING[0m | [36m__main__[0m:[36m_walkforward_predict[0m - [33m[1mgbm_rank (IS 
+CV): fold 5 has no usable training rows, skipping[0m
+C:\Users\Taffy Jackson\short-king-2.0\scripts\05_train_and_validate.py:160: Pandas4Warning: The copy keyword is 
+deprecated and will be removed in a future version. Copy-on-Write is active in pandas since 3.0 which utilizes a lazy 
+copy mechanism that defers copies until necessary. Use .copy() to make an eager copy if necessary.
+  X_tr = df.iloc[sp.train_idx][feat_cols].astype("float64", copy=False).fillna(0.5)
+C:\Users\Taffy Jackson\short-king-2.0\scripts\05_train_and_validate.py:161: Pandas4Warning: The copy keyword is 
+deprecated and will be removed in a future version. Copy-on-Write is active in pandas since 3.0 which utilizes a lazy 
+copy mechanism that defers copies until necessary. Use .copy() to make an eager copy if necessary.
+  X_te = df.iloc[sp.test_idx][feat_cols].astype("float64", copy=False).fillna(0.5)
+[32m18:12:37[0m | [33m[1mWARNING[0m | [36m__main__[0m:[36m_walkforward_predict[0m - [33m[1mgbm_rank (IS 
+CV): fold 6 has no usable training rows, skipping[0m
+C:\Users\Taffy Jackson\short-king-2.0\scripts\05_train_and_validate.py:160: Pandas4Warning: The copy keyword is 
+deprecated and will be removed in a future version. Copy-on-Write is active in pandas since 3.0 which utilizes a lazy 
+copy mechanism that defers copies until necessary. Use .copy() to make an eager copy if necessary.
+  X_tr = df.iloc[sp.train_idx][feat_cols].astype("float64", copy=False).fillna(0.5)
+C:\Users\Taffy Jackson\short-king-2.0\scripts\05_train_and_validate.py:161: Pandas4Warning: The copy keyword is 
+deprecated and will be removed in a future version. Copy-on-Write is active in pandas since 3.0 which utilizes a lazy 
+copy mechanism that defers copies until necessary. Use .copy() to make an eager copy if necessary.
+  X_te = df.iloc[sp.test_idx][feat_cols].astype("float64", copy=False).fillna(0.5)
+[32m18:12:37[0m | [33m[1mWARNING[0m | [36m__main__[0m:[36m_walkforward_predict[0m - [33m[1mgbm_rank (IS 
+CV): fold 7 has no usable training rows, skipping[0m
+C:\Users\Taffy Jackson\short-king-2.0\scripts\05_train_and_validate.py:160: Pandas4Warning: The copy keyword is 
+deprecated and will be removed in a future version. Copy-on-Write is active in pandas since 3.0 which utilizes a lazy 
+copy mechanism that defers copies until necessary. Use .copy() to make an eager copy if necessary.
+  X_tr = df.iloc[sp.train_idx][feat_cols].astype("float64", copy=False).fillna(0.5)
+C:\Users\Taffy Jackson\short-king-2.0\scripts\05_train_and_validate.py:161: Pandas4Warning: The copy keyword is 
+deprecated and will be removed in a future version. Copy-on-Write is active in pandas since 3.0 which utilizes a lazy 
+copy mechanism that defers copies until necessary. Use .copy() to make an eager copy if necessary.
+  X_te = df.iloc[sp.test_idx][feat_cols].astype("float64", copy=False).fillna(0.5)
+[32m18:12:37[0m | [33m[1mWARNING[0m | [36m__main__[0m:[36m_walkforward_predict[0m - [33m[1mgbm_rank (IS 
+CV): fold 8 has no usable training rows, skipping[0m
+C:\Users\Taffy Jackson\short-king-2.0\scripts\05_train_and_validate.py:160: Pandas4Warning: The copy keyword is 
+deprecated and will be removed in a future version. Copy-on-Write is active in pandas since 3.0 which utilizes a lazy 
+copy mechanism that defers copies until necessary. Use .copy() to make an eager copy if necessary.
+  X_tr = df.iloc[sp.train_idx][feat_cols].astype("float64", copy=False).fillna(0.5)
+C:\Users\Taffy Jackson\short-king-2.0\scripts\05_train_and_validate.py:161: Pandas4Warning: The copy keyword is 
+deprecated and will be removed in a future version. Copy-on-Write is active in pandas since 3.0 which utilizes a lazy 
+copy mechanism that defers copies until necessary. Use .copy() to make an eager copy if necessary.
+  X_te = df.iloc[sp.test_idx][feat_cols].astype("float64", copy=False).fillna(0.5)
+[32m18:12:37[0m | [33m[1mWARNING[0m | [36m__main__[0m:[36m_walkforward_predict[0m - [33m[1mgbm_rank (IS 
+CV): fold 9 has no usable training rows, skipping[0m
+C:\Users\Taffy Jackson\short-king-2.0\scripts\05_train_and_validate.py:160: Pandas4Warning: The copy keyword is 
+deprecated and will be removed in a future version. Copy-on-Write is active in pandas since 3.0 which utilizes a lazy 
+copy mechanism that defers copies until necessary. Use .copy() to make an eager copy if necessary.
+  X_tr = df.iloc[sp.train_idx][feat_cols].astype("float64", copy=False).fillna(0.5)
+C:\Users\Taffy Jackson\short-king-2.0\scripts\05_train_and_validate.py:161: Pandas4Warning: The copy keyword is 
+deprecated and will be removed in a future version. Copy-on-Write is active in pandas since 3.0 which utilizes a lazy 
+copy mechanism that defers copies until necessary. Use .copy() to make an eager copy if necessary.
+  X_te = df.iloc[sp.test_idx][feat_cols].astype("float64", copy=False).fillna(0.5)
+[32m18:12:38[0m | [33m[1mWARNING[0m | [36m__main__[0m:[36m_walkforward_predict[0m - [33m[1mgbm_rank (IS 
+CV): fold 10 has no usable training rows, skipping[0m
+C:\Users\Taffy Jackson\short-king-2.0\scripts\05_train_and_validate.py:160: Pandas4Warning: The copy keyword is 
+deprecated and will be removed in a future version. Copy-on-Write is active in pandas since 3.0 which utilizes a lazy 
+copy mechanism that defers copies until necessary. Use .copy() to make an eager copy if necessary.
+  X_tr = df.iloc[sp.train_idx][feat_cols].astype("float64", copy=False).fillna(0.5)
+C:\Users\Taffy Jackson\short-king-2.0\scripts\05_train_and_validate.py:161: Pandas4Warning: The copy keyword is 
+deprecated and will be removed in a future version. Copy-on-Write is active in pandas since 3.0 which utilizes a lazy 
+copy mechanism that defers copies until necessary. Use .copy() to make an eager copy if necessary.
+  X_te = df.iloc[sp.test_idx][feat_cols].astype("float64", copy=False).fillna(0.5)
+[32m18:12:38[0m | [33m[1mWARNING[0m | [36m__main__[0m:[36m_walkforward_predict[0m - [33m[1mgbm_rank (IS 
+CV): fold 11 has no usable training rows, skipping[0m
+C:\Users\Taffy Jackson\short-king-2.0\scripts\05_train_and_validate.py:160: Pandas4Warning: The copy keyword is 
+deprecated and will be removed in a future version. Copy-on-Write is active in pandas since 3.0 which utilizes a lazy 
+copy mechanism that defers copies until necessary. Use .copy() to make an eager copy if necessary.
+  X_tr = df.iloc[sp.train_idx][feat_cols].astype("float64", copy=False).fillna(0.5)
+C:\Users\Taffy Jackson\short-king-2.0\scripts\05_train_and_validate.py:161: Pandas4Warning: The copy keyword is 
+deprecated and will be removed in a future version. Copy-on-Write is active in pandas since 3.0 which utilizes a lazy 
+copy mechanism that defers copies until necessary. Use .copy() to make an eager copy if necessary.
+  X_te = df.iloc[sp.test_idx][feat_cols].astype("float64", copy=False).fillna(0.5)
+[32m18:12:38[0m | [33m[1mWARNING[0m | [36m__main__[0m:[36m_walkforward_predict[0m - [33m[1mgbm_rank (IS 
+CV): fold 12 has no usable training rows, skipping[0m
+C:\Users\Taffy Jackson\short-king-2.0\scripts\05_train_and_validate.py:160: Pandas4Warning: The copy keyword is 
+deprecated and will be removed in a future version. Copy-on-Write is active in pandas since 3.0 which utilizes a lazy 
+copy mechanism that defers copies until necessary. Use .copy() to make an eager copy if necessary.
+  X_tr = df.iloc[sp.train_idx][feat_cols].astype("float64", copy=False).fillna(0.5)
+C:\Users\Taffy Jackson\short-king-2.0\scripts\05_train_and_validate.py:161: Pandas4Warning: The copy keyword is 
+deprecated and will be removed in a future version. Copy-on-Write is active in pandas since 3.0 which utilizes a lazy 
+copy mechanism that defers copies until necessary. Use .copy() to make an eager copy if necessary.
+  X_te = df.iloc[sp.test_idx][feat_cols].astype("float64", copy=False).fillna(0.5)
+[32m18:12:38[0m | [33m[1mWARNING[0m | [36m__main__[0m:[36m_walkforward_predict[0m - [33m[1mgbm_rank (IS 
+CV): fold 13 has no usable training rows, skipping[0m
+C:\Users\Taffy Jackson\short-king-2.0\scripts\05_train_and_validate.py:160: Pandas4Warning: The copy keyword is 
+deprecated and will be removed in a future version. Copy-on-Write is active in pandas since 3.0 which utilizes a lazy 
+copy mechanism that defers copies until necessary. Use .copy() to make an eager copy if necessary.
+  X_tr = df.iloc[sp.train_idx][feat_cols].astype("float64", copy=False).fillna(0.5)
+C:\Users\Taffy Jackson\short-king-2.0\scripts\05_train_and_validate.py:161: Pandas4Warning: The copy keyword is 
+deprecated and will be removed in a future version. Copy-on-Write is active in pandas since 3.0 which utilizes a lazy 
+copy mechanism that defers copies until necessary. Use .copy() to make an eager copy if necessary.
+  X_te = df.iloc[sp.test_idx][feat_cols].astype("float64", copy=False).fillna(0.5)
+[32m18:12:38[0m | [33m[1mWARNING[0m | [36m__main__[0m:[36m_walkforward_predict[0m - [33m[1mgbm_rank (IS 
+CV): fold 14 has no usable training rows, skipping[0m
+C:\Users\Taffy Jackson\short-king-2.0\scripts\05_train_and_validate.py:160: Pandas4Warning: The copy keyword is 
+deprecated and will be removed in a future version. Copy-on-Write is active in pandas since 3.0 which utilizes a lazy 
+copy mechanism that defers copies until necessary. Use .copy() to make an eager copy if necessary.
+  X_tr = df.iloc[sp.train_idx][feat_cols].astype("float64", copy=False).fillna(0.5)
+C:\Users\Taffy Jackson\short-king-2.0\scripts\05_train_and_validate.py:161: Pandas4Warning: The copy keyword is 
+deprecated and will be removed in a future version. Copy-on-Write is active in pandas since 3.0 which utilizes a lazy 
+copy mechanism that defers copies until necessary. Use .copy() to make an eager copy if necessary.
+  X_te = df.iloc[sp.test_idx][feat_cols].astype("float64", copy=False).fillna(0.5)
+[32m18:12:38[0m | [33m[1mWARNING[0m | [36m__main__[0m:[36m_walkforward_predict[0m - [33m[1mgbm_rank (IS 
+CV): fold 15 has no usable training rows, skipping[0m
+C:\Users\Taffy Jackson\short-king-2.0\scripts\05_train_and_validate.py:160: Pandas4Warning: The copy keyword is 
+deprecated and will be removed in a future version. Copy-on-Write is active in pandas since 3.0 which utilizes a lazy 
+copy mechanism that defers copies until necessary. Use .copy() to make an eager copy if necessary.
+  X_tr = df.iloc[sp.train_idx][feat_cols].astype("float64", copy=False).fillna(0.5)
+C:\Users\Taffy Jackson\short-king-2.0\scripts\05_train_and_validate.py:161: Pandas4Warning: The copy keyword is 
+deprecated and will be removed in a future version. Copy-on-Write is active in pandas since 3.0 which utilizes a lazy 
+copy mechanism that defers copies until necessary. Use .copy() to make an eager copy if necessary.
+  X_te = df.iloc[sp.test_idx][feat_cols].astype("float64", copy=False).fillna(0.5)
+[32m18:12:38[0m | [33m[1mWARNING[0m | [36m__main__[0m:[36m_walkforward_predict[0m - [33m[1mgbm_rank (IS 
+CV): fold 16 has no usable training rows, skipping[0m
+C:\Users\Taffy Jackson\short-king-2.0\scripts\05_train_and_validate.py:160: Pandas4Warning: The copy keyword is 
+deprecated and will be removed in a future version. Copy-on-Write is active in pandas since 3.0 which utilizes a lazy 
+copy mechanism that defers copies until necessary. Use .copy() to make an eager copy if necessary.
+  X_tr = df.iloc[sp.train_idx][feat_cols].astype("float64", copy=False).fillna(0.5)
+C:\Users\Taffy Jackson\short-king-2.0\scripts\05_train_and_validate.py:161: Pandas4Warning: The copy keyword is 
+deprecated and will be removed in a future version. Copy-on-Write is active in pandas since 3.0 which utilizes a lazy 
+copy mechanism that defers copies until necessary. Use .copy() to make an eager copy if necessary.
+  X_te = df.iloc[sp.test_idx][feat_cols].astype("float64", copy=False).fillna(0.5)
+[32m18:12:39[0m | [1mINFO   [0m | [36mshort_king.models.ml[0m:[36mfit_gbm_ranker[0m - [1mfit_gbm_ranker: 
+rows=2,119 groups=6 avg_group_size=353.2 features=573[0m
+[32m18:12:39[0m | [1mINFO   [0m | [36m__main__[0m:[36m_walkforward_predict[0m - [1mgbm_rank (IS CV): fold 17 
+train n=2119 [2010-06-28..2021-12-12] -> test n=2219 [2022-01-10..2022-07-10][0m
+C:\Users\Taffy Jackson\short-king-2.0\scripts\05_train_and_validate.py:160: Pandas4Warning: The copy keyword is 
+deprecated and will be removed in a future version. Copy-on-Write is active in pandas since 3.0 which utilizes a lazy 
+copy mechanism that defers copies until necessary. Use .copy() to make an eager copy if necessary.
+  X_tr = df.iloc[sp.train_idx][feat_cols].astype("float64", copy=False).fillna(0.5)
+C:\Users\Taffy Jackson\short-king-2.0\scripts\05_train_and_validate.py:161: Pandas4Warning: The copy keyword is 
+deprecated and will be removed in a future version. Copy-on-Write is active in pandas since 3.0 which utilizes a lazy 
+copy mechanism that defers copies until necessary. Use .copy() to make an eager copy if necessary.
+  X_te = df.iloc[sp.test_idx][feat_cols].astype("float64", copy=False).fillna(0.5)
+[32m18:12:39[0m | [1mINFO   [0m | [36mshort_king.models.ml[0m:[36mfit_gbm_ranker[0m - [1mfit_gbm_ranker: 
+rows=4,245 groups=12 avg_group_size=353.8 features=573[0m
+[32m18:12:40[0m | [1mINFO   [0m | [36m__main__[0m:[36m_walkforward_predict[0m - [1mgbm_rank (IS CV): fold 18 
+train n=4245 [2010-06-28..2022-06-12] -> test n=2207 [2022-07-11..2023-01-08][0m
+C:\Users\Taffy Jackson\short-king-2.0\scripts\05_train_and_validate.py:160: Pandas4Warning: The copy keyword is 
+deprecated and will be removed in a future version. Copy-on-Write is active in pandas since 3.0 which utilizes a lazy 
+copy mechanism that defers copies until necessary. Use .copy() to make an eager copy if necessary.
+  X_tr = df.iloc[sp.train_idx][feat_cols].astype("float64", copy=False).fillna(0.5)
+C:\Users\Taffy Jackson\short-king-2.0\scripts\05_train_and_validate.py:161: Pandas4Warning: The copy keyword is 
+deprecated and will be removed in a future version. Copy-on-Write is active in pandas since 3.0 which utilizes a lazy 
+copy mechanism that defers copies until necessary. Use .copy() to make an eager copy if necessary.
+  X_te = df.iloc[sp.test_idx][feat_cols].astype("float64", copy=False).fillna(0.5)
+[32m18:12:40[0m | [1mINFO   [0m | [36mshort_king.models.ml[0m:[36mfit_gbm_ranker[0m - [1mfit_gbm_ranker: 
+rows=6,398 groups=18 avg_group_size=355.4 features=573[0m
+[32m18:12:41[0m | [1mINFO   [0m | [36m__main__[0m:[36m_walkforward_predict[0m - [1mgbm_rank (IS CV): fold 19 
+train n=6398 [2010-06-28..2022-12-11] -> test n=1801 [2023-01-09..2023-05-29][0m
+C:\Users\Taffy Jackson\short-king-2.0\scripts\05_train_and_validate.py:311: Pandas4Warning: The copy keyword is 
+deprecated and will be removed in a future version. Copy-on-Write is active in pandas since 3.0 which utilizes a lazy 
+copy mechanism that defers copies until necessary. Use .copy() to make an eager copy if necessary.
+  X_full_is = df_is[feat_cols].astype("float64", copy=False).fillna(0.5)
+C:\Users\Taffy Jackson\short-king-2.0\scripts\05_train_and_validate.py:315: Pandas4Warning: The copy keyword is 
+deprecated and will be removed in a future version. Copy-on-Write is active in pandas since 3.0 which utilizes a lazy 
+copy mechanism that defers copies until necessary. Use .copy() to make an eager copy if necessary.
+  X_te_oos = df.loc[oos_mask, feat_cols].astype("float64", copy=False).fillna(0.5)
+[32m18:12:41[0m | [1mINFO   [0m | [36mshort_king.models.ml[0m:[36mfit_gbm_ranker[0m - [1mfit_gbm_ranker: 
+rows=8,550 groups=24 avg_group_size=356.2 features=573[0m
+[32m18:12:43[0m | [1mINFO   [0m | [36m__main__[0m:[36mmain[0m - [1moof_predictions: 302,015 rows across 5 
+models[0m
+[32m18:12:44[0m | [1mINFO   [0m | [36m__main__[0m:[36mmain[0m - [1mmodel_metrics:
+   model period   ic_mean      ic_t  ic_hit_rate  ic_n_periods  decile_spread_mean
+      ew    ALL  0.046173  3.318632     0.661017            59           -0.008364
+      ew     IS  0.046753  2.264006     0.708333            24           -0.004288
+      ew    OOS  0.045775  2.416475     0.628571            35           -0.011159
+ gbm_cls    ALL -0.018872 -1.338346     0.442308            52            0.001857
+ gbm_cls     IS -0.044832 -2.238325     0.294118            17            0.000147
+ gbm_cls    OOS -0.006262 -0.341071     0.514286            35            0.002688
+gbm_rank    ALL -0.082086 -3.506805     0.288462            52           -0.005123
+gbm_rank     IS -0.086654 -2.154407     0.235294            17            0.004003
+gbm_rank    OOS -0.079867 -2.738057     0.314286            35           -0.009556
+   logit    ALL -0.019597 -1.894582     0.365385            52           -0.001390
+   logit     IS -0.019482 -1.245829     0.411765            17           -0.003066
+   logit    OOS -0.019653 -1.454594     0.342857            35           -0.000575
+   naive    ALL -0.027015 -2.419673     0.322034            59           -0.026865
+   naive     IS -0.030388 -1.670706     0.291667            24           -0.028017
+   naive    OOS -0.024702 -1.726938     0.342857            35           -0.026076[0m
+[32m18:12:44[0m | [1mINFO   [0m | [36m__main__[0m:[36mmain[0m - [1mcalibration_gbm_cls: 10 bins[0m
+[32m18:12:44[0m | [1mINFO   [0m | [36m__main__[0m:[36mmain[0m - [1minterpret: fitting full-sample GBM 
+classifier for SHAP / gain importance[0m
+C:\Users\Taffy Jackson\short-king-2.0\scripts\05_train_and_validate.py:492: Pandas4Warning: The copy keyword is 
+deprecated and will be removed in a future version. Copy-on-Write is active in pandas since 3.0 which utilizes a lazy 
+copy mechanism that defers copies until necessary. Use .copy() to make an eager copy if necessary.
+  _X_all = df[feat_cols].astype("float64", copy=False).fillna(0.5)
+[32m18:12:44[0m | [1mINFO   [0m | [36mshort_king.models.ml[0m:[36mfit_gbm_classifier[0m - 
+[1mfit_gbm_classifier: rows=19,614 features=573 pos_rate=0.493 early_stop=None[0m
+[32m18:12:48[0m | [1mINFO   [0m | [36m__main__[0m:[36mmain[0m - [1mgain_importance: top features = 
+['asset_growth_yoy_rk', 'balance_sheet_additionalPaidInCapital_rk', 'cash_flow_preferredDividendsPaid_rk', 
+'mom_4w_rk', 'balance_sheet_shortTermInvestments_rk'][0m
+[32m18:12:49[0m | [1mINFO   [0m | [36mshort_king.models.interpret[0m:[36mshap_values_sampled[0m - 
+[1mshap_values_sampled: sampled 2,000 of 19,614 rows (573 features)[0m
+C:\Users\Taffy Jackson\short-king-2.0\.venv\Lib\site-packages\shap\explainers\_tree.py:632: UserWarning: LightGBM 
+binary classifier with TreeExplainer shap values output has changed to a list of ndarray
+  warnings.warn(
+[32m18:12:51[0m | [1mINFO   [0m | [36mshort_king.models.interpret[0m:[36mplot_shap_summary[0m - 
+[1mplot_shap_summary: wrote C:\Users\Taffy Jackson\short-king-2.0\charts\shap_summary.png[0m
+[32m18:12:51[0m | [1mINFO   [0m | [36m__main__[0m:[36mmain[0m - [1m05_train_and_validate: wrote 
+oof_predictions.parquet, model_metrics.csv + interpret artefacts | took 35.4s[0m
