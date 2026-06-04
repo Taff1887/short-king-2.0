@@ -41,16 +41,6 @@ def _parse_args() -> argparse.Namespace:
                    help="Annualised borrow fee on short positions, %% p.a.")
     p.add_argument("--slippage-bps", type=float, default=5.0,
                    help="One-sided slippage on weight changes, bps.")
-    p.add_argument("--stop-loss-pct", type=float, default=1.0,
-                   help="Per-position hard-stop trigger (fraction of position notional). "
-                        "Default 1.0 = DISABLED (no stop). Pass e.g. 0.15 to clip any "
-                        "position whose monthly P&L would be worse than -15%% of its own "
-                        "notional. Each stop incurs an extra round-trip commission.")
-    p.add_argument("--stop-slippage-pct", type=float, default=0.01,
-                   help="Average execution shortfall on stop fills (fraction of position "
-                        "notional). 0.01 = 100bps central estimate for the top-500 ASX "
-                        "short-interest universe; 0.02 = conservative headline. Stops "
-                        "exit at the trigger plus this slippage. Default 0.01.")
     p.add_argument("--monthly", action="store_true",
                    help="Read OOF predictions from oof_predictions_monthly.parquet, set "
                         "periods_per_year=12, and write backtest_summary_monthly.csv.")
@@ -91,10 +81,6 @@ def _summary_row(model: str, strategy: str, period: str, result) -> dict:
         "hit_rate": float(s.get("hit_rate", float("nan"))),
         "avg_turnover": float(s.get("avg_turnover", float("nan"))),
         "n_rebalances": int(s.get("n_weeks", 0)),
-        "n_stops_total": int(s.get("n_stops_total", 0)),
-        "stop_loss_savings_total": float(s.get("stop_loss_savings_total", 0.0)),
-        "stop_commission_total": float(s.get("stop_commission_total", 0.0)),
-        "stop_slippage_drag_total": float(s.get("stop_slippage_drag_total", 0.0)),
     }
 
 
@@ -152,8 +138,6 @@ def main() -> int:
         bps_round_trip=args.bps_round_trip,
         annual_borrow_pct=args.annual_borrow_pct,
         slippage_bps=args.slippage_bps,
-        stop_loss_pct=args.stop_loss_pct if args.stop_loss_pct < 1.0 else None,
-        stop_slippage_pct=args.stop_slippage_pct,
         periods_per_year=periods_per_year,
     )
 
@@ -165,8 +149,7 @@ def main() -> int:
         f"{fractile}_short":        lambda g, _n=n: decile_short(g, n_deciles=_n),
         f"long_short_{fractile}":   lambda g, _n=n: long_short_decile(g, n_deciles=_n),
     }
-    logger.info(f"strategies={list(strategies)} | stop_loss_pct={cost.stop_loss_pct} "
-                f"+ stop_slippage_pct={cost.stop_slippage_pct} | "
+    logger.info(f"strategies={list(strategies)} | "
                 f"bps_round_trip={cost.bps_round_trip} | borrow={cost.annual_borrow_pct}%")
 
     summary_rows: list[dict] = []

@@ -3,11 +3,10 @@
 Reconstructs the L/S quintile SHORT positions from the out-of-sample holdout
 (2023-06 to 2026-05). For each (Date, Ticker) in the short basket:
 
-1. Compute the realised one-month forward return.
-2. Apply the same 15 % per-position stop loss + 100 bps fill slippage.
-3. Apply commission + slippage + borrow costs (matched to the headline
+1. Compute the realised one-month forward return (uncapped — no stop loss).
+2. Apply commission + slippage + borrow costs (matched to the headline
    ``CostConfig``).
-4. Compute the *contribution to book* = signed_weight * stop-clipped return.
+3. Compute the *contribution to book* = signed_weight * realised return.
 
 Then aggregate by Ticker over the entire OOS window:
 
@@ -27,7 +26,7 @@ from __future__ import annotations
 
 import argparse
 
-import numpy as np
+import numpy as np  # noqa: F401  # kept for downstream readers
 import pandas as pd
 
 from short_king.portfolio.backtest import CostConfig
@@ -134,26 +133,11 @@ def main() -> int:
     # Stock return = exit/entry - 1; position return for a short = -weight * stock_return.
     entry["stock_ret"] = entry["exit_price"] / entry["entry_price"] - 1.0
     entry = entry.dropna(subset=["stock_ret"])
-    # Position contribution before stop = signed_weight * stock_return.
-    entry["pos_contrib_raw"] = entry["weight"] * entry["stock_ret"]
+    # Position contribution = signed_weight * stock_return (no stop applied).
+    entry["pos_contrib"] = entry["weight"] * entry["stock_ret"]
 
-    # Apply per-position stop (if configured). With the new default of
-    # stop_loss_pct=None the stop is disabled entirely — every position
-    # realises its raw monthly forward return.
-    stop_pct = cost.stop_loss_pct
-    slip_pct = cost.stop_slippage_pct or 0.0
-    if stop_pct is None or stop_pct >= 1.0:
-        stopped = pd.Series(False, index=entry.index)
-        entry["stop_triggered"] = stopped
-        entry["pos_contrib"] = entry["pos_contrib_raw"]
-    else:
-        floor = -(stop_pct + slip_pct) * entry["weight"].abs()
-        trigger = -stop_pct * entry["weight"].abs()
-        stopped = entry["pos_contrib_raw"] < trigger
-        entry["stop_triggered"] = stopped
-        entry["pos_contrib"] = np.where(stopped, floor, entry["pos_contrib_raw"])
-    # Per-position cost: commission + slippage on |weight| (entry + exit), plus
-    # an extra round-trip when the stop fires. Borrow ~ short_weight * 1.5%/12.
+    # Per-position cost: commission + slippage on |weight| (entry + exit) +
+    # borrow ~ short_weight * 1.5%/12.
     bps_round = cost.bps_round_trip / 10_000.0
     slip_bps = cost.slippage_bps / 10_000.0
     borrow_m = (cost.annual_borrow_pct / 100.0) / cost.periods_per_year
@@ -161,7 +145,6 @@ def main() -> int:
         entry["weight"].abs() * 2 * bps_round
         + entry["weight"].abs() * 2 * slip_bps
         + entry["weight"].abs() * borrow_m
-        + entry["weight"].abs() * stopped.astype(float) * 2 * bps_round
     )
     entry["pos_pnl_net"] = entry["pos_contrib"] - entry["cost"]
 
@@ -169,12 +152,6 @@ def main() -> int:
     # trade_return positive when the stock falls: trade_return = stock_ret * sign(weight).
     # E.g. weight=-0.005, stock_ret=-0.10 -> trade_return = -0.10 * -1 = +0.10 (winning short).
     entry["trade_return"] = entry["stock_ret"] * np.sign(entry["weight"])
-    if stop_pct is None or stop_pct >= 1.0:
-        entry["trade_return_capped"] = entry["trade_return"]
-    else:
-        entry["trade_return_capped"] = np.where(
-            stopped, -(stop_pct + slip_pct), entry["trade_return"]
-        )
 
     # Attach the "why" features as-of the entry date.
     why_keys = [c for c, _ in WHY_COLS if c in features.columns]
@@ -188,8 +165,7 @@ def main() -> int:
                                      [entry["Date"], entry["Ticker"]]))["mktCap"].to_numpy() / 1e6)
     out_cols = [
         "Date", "Ticker", "Company", "weight", "entry_price", "exit_price",
-        "trade_return", "trade_return_capped", "stop_triggered",
-        "pos_contrib_raw", "pos_contrib", "cost", "pos_pnl_net",
+        "trade_return", "pos_contrib", "cost", "pos_pnl_net",
         "mktCap_AUDm", *why_keys,
     ]
     pos_csv = settings.reports_dir / "oos_short_positions.csv"
@@ -201,11 +177,10 @@ def main() -> int:
         Company=("Company", lambda s: s.dropna().iloc[0] if s.notna().any() else ""),
         n_months_shorted=("Ticker", "size"),
         total_pnl_book=("pos_pnl_net", "sum"),
-        avg_trade_return=("trade_return_capped", "mean"),
-        best_month=("trade_return_capped", "max"),
-        worst_month=("trade_return_capped", "min"),
-        hit_rate=("trade_return_capped", lambda s: float((s > 0).mean())),
-        n_stops_triggered=("stop_triggered", "sum"),
+        avg_trade_return=("trade_return", "mean"),
+        best_month=("trade_return", "max"),
+        worst_month=("trade_return", "min"),
+        hit_rate=("trade_return", lambda s: float((s > 0).mean())),
         avg_weight=("weight", "mean"),
         avg_mktCap_AUDm=("mktCap_AUDm", "mean"),
         avg_short_pct=("ShortPct", "mean"),
@@ -235,21 +210,18 @@ def main() -> int:
         return out[[
             "Ticker", "Company", "n_months_shorted", "total_pnl_book_%",
             "avg_trade_%", "best_%", "worst_%", "hit_%",
-            "n_stops_triggered", "avg_SI_%", "mktCap_$m", "first", "last",
+            "avg_SI_%", "mktCap_$m", "first", "last",
         ]]
 
     md_path = settings.reports_dir / "oos_trades.md"
-    if stop_pct is None or stop_pct >= 1.0:
-        stop_desc = "**no stop loss** (per-position returns uncapped — same as the default headline backtest)"
-    else:
-        stop_desc = f"{stop_pct * 100:.0f} % stop + {slip_pct * 100:.0f} bps fill slippage"
     lines = [
         f"# OOS short trades — model = {args.model}",
         "",
         f"_Reconstructed from {len(entry):,} OOS short positions across "
         f"{entry['Ticker'].nunique()} unique tickers in the 36-month "
-        f"holdout (2023-06 → 2026-05). Per-position P&L applies "
-        f"{stop_desc} + commission + borrow as the headline backtest._",
+        f"holdout (2023-06 → 2026-05). Per-position P&L is uncapped "
+        "(no stop loss) — commission + borrow + slippage apply per the "
+        "headline backtest._",
         "",
         "**Columns:** "
         "`n_months_shorted` = number of monthly rebalances the ticker was in "
@@ -283,20 +255,17 @@ def main() -> int:
     lines.append(_to_md(losers))
 
     # Aggregate stats.
-    total_pnl = float(entry["pos_pnl_net"].sum())
     short_only_pnl = float(entry.loc[entry["weight"] < 0, "pos_pnl_net"].sum())
-    median_trade = float(entry["trade_return_capped"].median())
-    win_rate = float((entry["trade_return_capped"] > 0).mean())
-    stop_rate = float(entry["stop_triggered"].mean())
+    median_trade = float(entry["trade_return"].median())
+    win_rate = float((entry["trade_return"] > 0).mean())
     lines += [
         "",
-        f"## Aggregate OOS stats (short leg only)",
+        "## Aggregate OOS stats (short leg only)",
         "",
         f"- **Total short-leg P&L**: {short_only_pnl * 100:+.1f} % of book "
         f"(summed over {len(entry):,} monthly positions)",
         f"- **Median per-position return**: {median_trade * 100:+.2f} %",
         f"- **Win rate** (per-position): {win_rate * 100:.1f} %",
-        f"- **Stop-fire rate**: {stop_rate * 100:.1f} % of positions clipped at -16 %",
         f"- **Best single month**: "
         f"`{agg.iloc[0]['Ticker']}` ({_fmt(agg.head(1)).iloc[0]['best_%']:+.2f} %)",
         f"- **Worst single month**: "

@@ -1,6 +1,6 @@
 # short-king-2.0 - Results
 
-_Generated 2026-06-04T23:19:49_
+_Generated 2026-06-05T09:10:45_
 
 ## Model metrics (out-of-fold)
 
@@ -14,18 +14,18 @@ _Generated 2026-06-04T23:19:49_
 
 ## Backtest summary
 
-| model | strategy | CAGR | vol | Sharpe | Sortino | MaxDD | Calmar | hit_rate | avg_turnover | n_rebalances | n_stops_total | stop_loss_savings_total | stop_commission_total | stop_slippage_drag_total |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| ew | quintile_short | -0.116 | 0.167 | -0.651 | -0.903 | -0.547 | -0.211 | 0.415 | 0.133 | 212 | 234 | 0.138 | 0.014 | 0.028 |
-| ew | long_short_quintile | 0.058 | 0.154 | 0.443 | 0.688 | -0.290 | 0.200 | 0.491 | 0.261 | 212 | 1003 | 0.615 | 0.059 | 0.117 |
-| gbm_cls | quintile_short | 0.017 | 0.206 | 0.180 | 0.296 | -0.367 | 0.045 | 0.475 | 0.390 | 99 | 455 | 0.496 | 0.026 | 0.052 |
-| gbm_cls | long_short_quintile | 0.144 | 0.147 | 0.985 | 1.609 | -0.243 | 0.592 | 0.556 | 0.759 | 99 | 610 | 0.592 | 0.035 | 0.070 |
-| gbm_rank | quintile_short | 0.129 | 0.256 | 0.600 | 1.013 | -0.377 | 0.343 | 0.505 | 0.302 | 99 | 637 | 0.720 | 0.036 | 0.073 |
-| gbm_rank | long_short_quintile | 0.210 | 0.200 | 1.052 | 1.674 | -0.324 | 0.648 | 0.576 | 0.538 | 99 | 687 | 0.754 | 0.039 | 0.079 |
-| logit | quintile_short | -0.043 | 0.161 | -0.191 | -0.296 | -0.330 | -0.129 | 0.473 | 0.155 | 91 | 89 | 0.136 | 0.009 | 0.019 |
-| logit | long_short_quintile | 0.186 | 0.109 | 1.617 | 3.134 | -0.108 | 1.733 | 0.560 | 0.303 | 91 | 137 | 0.191 | 0.014 | 0.029 |
-| naive | quintile_short | 0.082 | 0.218 | 0.468 | 0.734 | -0.305 | 0.268 | 0.491 | 0.052 | 212 | 568 | 0.504 | 0.033 | 0.066 |
-| naive | long_short_quintile | 0.301 | 0.135 | 2.018 | 3.839 | -0.069 | 4.368 | 0.590 | 0.170 | 212 | 1172 | 0.924 | 0.068 | 0.137 |
+| model | strategy | period | CAGR | vol | Sharpe | Sortino | MaxDD | Calmar | hit_rate | avg_turnover | n_rebalances |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| ew | quintile_short | ALL | -0.054 | 0.003 | -22.089 | -6.856 | -0.241 | -0.226 | 0.000 | 0.131 | 259 |
+| ew | long_short_quintile | ALL | -0.093 | 0.004 | -23.189 | -6.887 | -0.380 | -0.244 | 0.000 | 0.264 | 259 |
+| gbm_cls | quintile_short | ALL | -0.128 | 0.005 | -26.730 | -6.965 | -0.227 | -0.564 | 0.000 | 0.390 | 99 |
+| gbm_cls | long_short_quintile | ALL | -0.220 | 0.010 | -24.712 | -6.925 | -0.374 | -0.590 | 0.000 | 0.748 | 99 |
+| gbm_rank | quintile_short | ALL | -0.103 | 0.003 | -33.354 | -7.050 | -0.184 | -0.559 | 0.000 | 0.300 | 99 |
+| gbm_rank | long_short_quintile | ALL | -0.167 | 0.006 | -28.555 | -6.994 | -0.289 | -0.577 | 0.000 | 0.535 | 99 |
+| logit | quintile_short | ALL | -0.062 | 0.005 | -11.827 | -6.166 | -0.102 | -0.602 | 0.000 | 0.156 | 91 |
+| logit | long_short_quintile | ALL | -0.105 | 0.010 | -10.743 | -5.998 | -0.171 | -0.613 | 0.000 | 0.305 | 91 |
+| naive | quintile_short | ALL | -0.031 | 0.002 | -20.390 | -6.800 | -0.144 | -0.218 | 0.000 | 0.054 | 259 |
+| naive | long_short_quintile | ALL | -0.071 | 0.003 | -22.227 | -6.860 | -0.303 | -0.235 | 0.000 | 0.189 | 259 |
 
 ## Charts
 

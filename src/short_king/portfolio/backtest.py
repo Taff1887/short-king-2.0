@@ -66,39 +66,12 @@ class CostConfig:
         If True, also apply ``annual_borrow_pct`` to the long book (some
         prime-broker structures charge a leverage/financing fee on the
         long leg). Default False - shorts only.
-    stop_loss_pct:
-        Per-position hard stop *trigger*. Any position whose realised weekly
-        P&L is worse than ``-stop_loss_pct * |weight|`` is clipped to a
-        slightly deeper floor that includes ``stop_slippage_pct`` (see
-        below) to reflect that real stops do not fill at the trigger price.
-        Each stop also incurs an extra round-trip commission to model the
-        in-week exit *and* the re-entry that the rebalance-level
-        delta-commission would otherwise miss. Set to ``None`` (or
-        ``>= 1.0``) to disable. Default 0.15 reflects the v1 notebook's
-        hard-stop convention and is the standard short-squeeze guard for
-        ASX small/mid-caps.
-    stop_slippage_pct:
-        Average execution shortfall on a stop fill, as a fraction of the
-        position notional. Realistic ranges for this universe: 10-30 bps
-        for ASX 50 names, 50-150 bps for mid-caps, 100-500 bps for
-        small-caps, 200-1000 bps on halted / takeover / squeeze names.
-        Default 0.01 (100 bps) is a balanced central estimate for a
-        top-500-by-short-interest book; 0.02 (200 bps) would be the
-        conservative headline number. The effective per-position floor
-        when a stop fires is ``-(stop_loss_pct + stop_slippage_pct) * |w|``.
     """
 
     bps_round_trip: float = 25.0
     annual_borrow_pct: float = 1.5
     slippage_bps: float = 5.0
     bench_borrow_for_longs: bool = False
-    # Stop loss disabled by default - see README §"What does the model look
-    # like with NO stop loss?". The naive per-position win-rate is 53.4 %
-    # in OOS without any floor, but the fat right-tail of squeezes makes the
-    # naked-short Sharpe negative. Users who want to add a stop pass
-    # `stop_loss_pct=0.15` (or whatever) to CostConfig explicitly.
-    stop_loss_pct: float | None = None
-    stop_slippage_pct: float = 0.01
     # Annualisation factor: 52 for weekly rebalance, 12 for monthly, 4 for
     # quarterly. Used by ``_summarise_returns`` for CAGR / vol / Sharpe / borrow.
     periods_per_year: int = 52
@@ -373,39 +346,10 @@ def backtest_weekly(
     w_held = w_wide.loc[held_dates]
     r_held = stock_rets.reindex(index=held_dates, columns=w_held.columns).fillna(0.0)
 
-    # Raw per-position weekly P&L contribution: long position earns the stock
+    # Per-position weekly P&L contribution: long position earns the stock
     # return, short position earns -stock_return. Encoded by signed weight.
-    contrib_raw = w_held * r_held
-    gross_pre_stop = contrib_raw.sum(axis=1)
-
-    # ---- Per-position hard stop ----------------------------------------------
-    # Trigger: if a single position would lose more than ``stop_loss_pct`` of
-    # its own notional in the week. Execution: capped at a *deeper* floor of
-    # ``stop_loss_pct + stop_slippage_pct`` to reflect that real stops do not
-    # fill at the trigger price. For a -5 %-weight short with a 15 % stop and
-    # 1 % slippage, the floor is -0.05 * 0.16 = -0.008 of book.
-    stop_pct = cfg.stop_loss_pct
-    slip_pct = float(cfg.stop_slippage_pct or 0.0)
-    if stop_pct is not None and stop_pct < 1.0:
-        trigger = -float(stop_pct) * w_held.abs()
-        floor = -(float(stop_pct) + slip_pct) * w_held.abs()
-        # A position is "stopped" the moment the raw contribution breaches the
-        # trigger - the deeper floor is just where the fill lands.
-        stopped = contrib_raw < trigger
-        contrib_capped = contrib_raw.where(~stopped, floor)
-    else:
-        stopped = pd.DataFrame(False, index=contrib_raw.index, columns=contrib_raw.columns)
-        contrib_capped = contrib_raw
-    gross_per_week = contrib_capped.sum(axis=1)
-    n_stops = stopped.sum(axis=1).astype(int)
-    # Avoided loss = (gross_per_week - gross_pre_stop). With slippage > 0 this
-    # is still >= 0 unless slippage exceeds the raw move past the trigger,
-    # which can happen for borderline triggers - that's the realistic case
-    # where stop-slippage erodes some of the cap's benefit.
-    stop_loss_savings = (gross_per_week - gross_pre_stop)
-    # Diagnostic: how much of the floor came from slippage rather than the
-    # trigger itself - useful for sensitivity tables.
-    stop_slippage_drag = (slip_pct * (stopped.astype(float) * w_held.abs())).sum(axis=1)
+    contrib = w_held * r_held
+    gross_per_week = contrib.sum(axis=1)
 
     # Old weight = the previous *target* (no drift). For the first held week
     # the old weight is zero (book starts flat).
@@ -425,12 +369,6 @@ def backtest_weekly(
     commission = two_way_traded * cfg.bps_round_trip / 10_000.0
     slippage = two_way_traded * cfg.slippage_bps / 10_000.0
 
-    # Stop-loss exit cost: each stop fires an in-week close trade AND the
-    # rebalance delta-commission would otherwise miss the implied re-entry,
-    # so we charge BOTH sides (2x ``bps_round_trip``) on the stopped notional.
-    stopped_notional = (stopped.astype(float) * w_held.abs()).sum(axis=1)
-    stop_commission = stopped_notional * 2.0 * cfg.bps_round_trip / 10_000.0
-
     # Borrow cost on *short* positions. Charged on the average weight held
     # during the period (here equal to ``new_w`` because no drift). Per-week
     # rate = annual / 52.
@@ -441,7 +379,7 @@ def backtest_weekly(
     if cfg.bench_borrow_for_longs:
         borrow = borrow + long_notional * borrow_rate_wk
 
-    cost_total = commission + slippage + borrow + stop_commission
+    cost_total = commission + slippage + borrow
     net_per_week = gross_per_week - cost_total
 
     n_positions = (new_w.abs() > 1e-12).sum(axis=1).astype(int)
@@ -450,18 +388,13 @@ def backtest_weekly(
         {
             "Date": held_dates,
             "ret_gross": gross_per_week.to_numpy(),
-            "ret_gross_pre_stop": gross_pre_stop.to_numpy(),
-            "stop_loss_savings": stop_loss_savings.to_numpy(),
-            "stop_slippage_drag": stop_slippage_drag.to_numpy(),
             "ret_net": net_per_week.to_numpy(),
             "turnover": turnover.to_numpy(),
             "cost_total": cost_total.to_numpy(),
             "borrow": borrow.to_numpy(),
             "commission": commission.to_numpy(),
-            "stop_commission": stop_commission.to_numpy(),
             "slippage": slippage.to_numpy(),
             "n_positions": n_positions.to_numpy(),
-            "n_stops": n_stops.to_numpy(),
             "gross_exposure": (long_notional + short_notional).to_numpy(),
             "net_exposure": (long_notional - short_notional).to_numpy(),
         }
@@ -481,12 +414,6 @@ def backtest_weekly(
         bench=bench_aligned,
         periods_per_year=cfg.periods_per_year,
     )
-    # Stop-loss diagnostics piggy-backed onto the summary Series so they
-    # surface in the reports/backtest_summary.csv aggregation step.
-    summary["n_stops_total"] = int(n_stops.sum())
-    summary["stop_loss_savings_total"] = float(stop_loss_savings.sum())
-    summary["stop_commission_total"] = float(stop_commission.sum())
-    summary["stop_slippage_drag_total"] = float(stop_slippage_drag.sum())
 
     trades = _trades_long(weights)
 
