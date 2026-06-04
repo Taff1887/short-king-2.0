@@ -18,6 +18,8 @@ from __future__ import annotations
 import argparse
 import datetime as dt
 
+import pandas as pd
+
 from short_king.data.assemble import (
     assemble_pit_panel,
     panel_quality_summary,
@@ -126,7 +128,8 @@ def main() -> int:
     clean = clean_lc.rename(columns=_FROM_CLEAN)
     write_clean(clean, settings.processed_dir / "master_clean.parquet")
 
-    # 3) Feature matrix.
+    # 3) Feature matrix (computed weekly so rolling windows like vol_4w stay
+    # meaningful even when we later downsample to monthly for modelling).
     features = build_feature_panel(
         clean,
         cross_sectional=not args.no_cross_sectional,
@@ -134,10 +137,26 @@ def main() -> int:
     )
     out_features = write_feature_panel(features, settings.processed_dir / "features.parquet")
 
+    # 3b) Monthly snapshot - last available Friday in each calendar month.
+    # Saves a separate features_monthly.parquet so callers can pick either
+    # frequency without re-running the (cheap) feature build. Cross-sectional
+    # ranks are recomputed at month-end so they reflect month-end peers, not
+    # the weekly peer group.
+    monthly = features.copy()
+    monthly["Date"] = pd.to_datetime(monthly["Date"])
+    monthly["_ym"] = monthly["Date"].dt.to_period("M")
+    last_friday_per_month = monthly.groupby("_ym")["Date"].transform("max")
+    monthly = monthly[monthly["Date"] == last_friday_per_month].drop(columns="_ym")
+    monthly = monthly.sort_values(["Date", "Ticker"]).reset_index(drop=True)
+    out_monthly = write_feature_panel(
+        monthly, settings.processed_dir / "features_monthly.parquet"
+    )
+
     t1 = dt.datetime.now()
     logger.info(
-        f"04_build_features: wrote {out_features} | rows={len(features):,} "
-        f"cols={features.shape[1]} | took {(t1 - t0).total_seconds():.1f}s"
+        f"04_build_features: weekly {out_features} | rows={len(features):,} cols={features.shape[1]}\n"
+        f"                   monthly {out_monthly} | rows={len(monthly):,} dates={monthly['Date'].nunique()}\n"
+        f"                   took {(t1 - t0).total_seconds():.1f}s"
     )
     return 0
 

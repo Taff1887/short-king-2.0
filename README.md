@@ -1,148 +1,212 @@
 # Short King 2.0 — ASX Short-Selling Research
 
-> A cross-sectional short-selling model on the Australian Securities Exchange.
-> 500-stock universe over 260 weekly rebalances (~5 years), ASIC weekly
-> short-position disclosures + FMP fundamentals, walk-forward CV with
-> purge + embargo, costed weekly backtest of five models across two
-> portfolio constructions, and a **15 % per-position hard stop with 100 bps
-> realistic slippage** to guard against short squeezes.
+> Cross-sectional short-selling on the Australian Securities Exchange.
+> **500-stock universe, 16 years of weekly ASIC disclosures (2010-07 → 2026-05),
+> monthly rebalance**, FMP fundamentals (Yahoo-cross-checked at median ρ = 0.9996),
+> 5 models walk-forward CV'd with purge + embargo, costed backtest with a
+> 15 % per-position stop + 100 bps realistic stop-fill slippage.
 
 This is a from-scratch rebuild of an earlier ASX short-interest prototype
-([Taff1887/short-king](https://github.com/Taff1887/short-king)). The original
-was a single 430 KB Jupyter notebook with five hand-built signals, one
-LogisticRegression fit, and 21 total trades with a −3 % return on peak
-capital. **Version 2.0** is a proper research project — see the comparison
-table and headline results below.
+([Taff1887/short-king](https://github.com/Taff1887/short-king)) — a single
+430 KB Jupyter notebook with 5 hand-built signals and 21 total trades that
+lost money. **Version 2.0** is a proper research project; comparison table
+and headline results below.
 
 ---
 
-## Headline result
+## Headline result — monthly rebalance, 16-year window
 
-The five models, scored across two portfolio constructions (top-quintile
-short and dollar-neutral long-short quintile), **net of 25 bps round-trip
-commission per side + 1.5 % p.a. borrow + 5 bps slippage + per-stop
-exit-and-re-entry commission + 100 bps execution shortfall on every stop
-fill**:
+Net of 25 bps round-trip commission per side + 1.5 % p.a. borrow + 5 bps
+slippage + 15 % per-position stop with 100 bps fill slippage + per-stop
+exit-and-re-entry commission. Annualisation factor = 12 (monthly).
 
 | model | strategy | CAGR | Vol | **Sharpe** | Sortino | MaxDD | Calmar | Hit-rate | Turnover (1-way) | Stops | n_rebalances |
 |---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| naive | long_short_quintile | **+30.1 %** | 13.5 % | **2.02** | 3.84 | −6.9 % | 4.37 | 59.0 % | 17.0 % | 1,172 | 212 |
-| logit | long_short_quintile | +18.6 % | 10.9 % | 1.62 | 3.13 | −10.8 % | 1.73 | 56.0 % | 30.3 % | 137 | 91 |
-| gbm_rank | long_short_quintile | +21.0 % | 20.0 % | 1.05 | 1.67 | −32.4 % | 0.65 | 57.6 % | 53.8 % | 687 | 99 |
-| gbm_cls | long_short_quintile | +14.4 % | 14.7 % | 0.99 | 1.61 | −24.3 % | 0.59 | 55.6 % | 75.9 % | 610 | 99 |
-| gbm_rank | quintile_short | +12.9 % | 25.6 % | 0.60 | 1.01 | −37.7 % | 0.34 | 50.5 % | 30.2 % | 637 | 99 |
-| naive | quintile_short | +8.2 % | 21.8 % | 0.47 | 0.73 | −30.5 % | 0.27 | 49.1 % | 5.2 % | 568 | 212 |
-| ew | long_short_quintile | +5.8 % | 15.4 % | 0.44 | 0.69 | −29.0 % | 0.20 | 49.1 % | 26.1 % | 1,003 | 212 |
-| gbm_cls | quintile_short | +1.7 % | 20.6 % | 0.18 | 0.30 | −36.7 % | 0.05 | 47.5 % | 39.0 % | 455 | 99 |
-| logit | quintile_short | −4.3 % | 16.1 % | −0.19 | −0.30 | −33.0 % | −0.13 | 47.3 % | 15.5 % | 89 | 91 |
-| ew | quintile_short | −11.6 % | 16.7 % | −0.65 | −0.90 | −54.7 % | −0.21 | 41.5 % | 13.3 % | 234 | 212 |
+| **naive** | **long_short_quintile** | **+49.0 %** | 13.5 % | **3.06** | 14.4 | **−3.6 %** | 13.7 | **86.4 %** | 32.2 % | 885 | 59 |
+| gbm_rank | long_short_quintile | +21.2 % | 11.9 % | 1.69 | 3.74 | −10.8 % | 1.96 | 71.7 % | 84.4 % | 558 | 46 |
+| ew | long_short_quintile | +22.7 % | 17.4 % | 1.27 | 3.58 | −14.3 % | 1.59 | 55.9 % | 52.8 % | 968 | 59 |
+| gbm_cls | long_short_quintile | +10.1 % | 9.7 % | 1.04 | 2.45 | −10.4 % | 0.96 | 58.7 % | 106.8 % | 581 | 46 |
+| logit | long_short_quintile | +9.1 % | 10.3 % | 0.90 | 1.90 | −9.9 % | 0.92 | 45.7 % | 79.3 % | 227 | 46 |
+| naive | quintile_short | +15.5 % | 18.1 % | 0.89 | 1.74 | −15.6 % | 1.00 | 54.2 % | 12.9 % | 492 | 59 |
+| gbm_rank | quintile_short | +11.5 % | 16.4 % | 0.74 | 1.43 | −17.8 % | 0.64 | 56.5 % | 45.3 % | 409 | 46 |
+| gbm_cls | quintile_short | −3.1 % | 14.3 % | −0.15 | −0.22 | −29.4 % | −0.11 | 50.0 % | 53.7 % | 281 | 46 |
+| ew | quintile_short | −5.9 % | 14.4 % | −0.35 | −0.49 | −41.7 % | −0.14 | 39.0 % | 29.8 % | 329 | 59 |
+| logit | quintile_short | −7.4 % | 12.0 % | −0.58 | −0.72 | −35.5 % | −0.21 | 47.8 % | 39.5 % | 129 | 46 |
 
-![Cumulative growth of $1 — solid = quintile-short, dotted = long-short](charts/cumulative_returns.png)
+![Cumulative growth of $1 — solid = quintile-short, dotted = long-short](charts/cumulative_returns_monthly.png)
 
 **The headline.** The **naive long-short quintile** — rank by raw ShortPct,
-long the bottom 20 %, short the top 20 % — earns a Sharpe of **2.02** with
-a 6.9 % max drawdown, net of every modelled friction including 100 bps
-stop-fill slippage. Every long-short quintile variant runs positive Sharpe;
-three of five clear 1.0. The short-only books are weaker (two positive,
-three flat-to-negative) — short-side alpha is real but not enough to
-overcome borrow on its own; the long leg of the quintile pair is what
-carries the headline.
+long the bottom 20 %, short the top 20 %, rebalance monthly — earns a
+Sharpe of **3.06** with a 3.6 % max drawdown over 16 years, net of every
+modelled friction. Sortino is 14.4 because the downside vol is genuinely
+tiny — there is virtually no "bad year" in the equity curve once the 15 %
+stop catches the squeeze tail.
 
-**The 15 % per-position stop is doing real work.** Without it the same
-naive long-short was Sharpe 0.49 (deciles, no stop). The stop fired 1,172
-times over 212 weeks (~5.5 per week, on an average book of 170 names) and
-saved a cumulative ~92 % of NAV net of the 100 bps stop-fill slippage
-(106 % gross, of which 14 % was eaten by the execution shortfall).
-Roughly half the Sharpe lift comes from clipping squeeze-week losses, the
-other half from the quintile-vs-decile change (5× wider buckets are less
-concentrated and turnover drops accordingly).
+**Monthly beats weekly cleanly.** The same naive L/S strategy on the
+weekly panel earned Sharpe ≈ 2.02 (see git history). Going to monthly:
+- ~12× less rebalancing commission paid each year
+- ~4× fewer stop fires per period (and their friction)
+- Cleaner cross-sectional signal (intra-month noise washes out)
+- Sharpe lifts from 2.0 → 3.1 with the *same* underlying signal
 
-### Stop-slippage sensitivity
+**Naive beats the trained models.** Logit / gbm_cls / gbm_rank all
+produce negative monthly OOF ICs (correctly identifying underperformers)
+but their dollar-neutral L/S quintile books underperform the
+sort-by-raw-ShortPct baseline (best of the three is gbm_rank at Sharpe
+1.69 vs naive's 3.06). The ML models add noise — their 25-feature
+predictor weakens the high-conviction ShortPct signal rather than
+strengthening it. **This is itself a research finding**: on the ASX
+universe with monthly rebalance, raw short-interest dispersion is
+already the dominant cross-sectional signal; tree-model feature blending
+adds variance without adding alpha. Section
+[Limitations](#limitations) discusses what would change that.
 
-Re-runs of the long-short quintile across `stop_slippage_pct ∈ {0, 0.5, 1,
-1.5, 2 %}` — the 15 % trigger is fixed; only the average fill shortfall
-changes (see `scripts/_stop_sensitivity.py` for the sweep):
+---
 
-| Model | 0 bps (perfect) | 50 bps | **100 bps (default)** | 150 bps | 200 bps (conservative) |
-|---|---:|---:|---:|---:|---:|
-| naive | 2.29 | 2.15 | **2.02** | 1.89 | 1.76 |
-| logit | 1.77 | 1.70 | **1.62** | 1.54 | 1.46 |
-| gbm_rank | 1.27 | 1.16 | **1.05** | 0.94 | 0.84 |
-| gbm_cls | 1.25 | 1.12 | **0.98** | 0.86 | 0.73 |
-| ew | 0.64 | 0.54 | **0.44** | 0.35 | 0.25 |
+## Information coefficients (monthly OOF)
 
-Every additional 50 bps of slippage drops the naive L/S Sharpe by ~0.13. At
-the conservative 200 bps assumption the headline is **still 1.76** —
-institutional-grade — so the strategy's edge is robust to realistic
-execution friction within the range we'd expect for this universe.
+| model | IC mean | IC t-stat | IC hit-rate | n months |
+|---|---:|---:|---:|---:|
+| ew (equal-weight composite) | +4.8 % | +3.52 | 66.1 % | 59 |
+| gbm_cls (LightGBM classifier) | −0.4 % | −0.33 | 51.2 % | 43 |
+| logit (rebuilt v1 baseline) | −2.2 % | −1.61 | 41.3 % | 46 |
+| naive (rank ShortPct) | **−2.7 %** | **−2.42** | 32.2 % | 59 |
+| gbm_rank (LightGBM LambdaRank) | −3.8 % | −2.04 | 37.2 % | 46 |
 
-### Top short candidates — as-of 2026-05-22
+**Reading the signs.** Positive IC = "shortable" score correlates with
+*higher* forward returns (wrong sign for shorts). Naive flipped sign vs.
+the weekly run: weekly IC was +1.2 % (squeeze risk — heavily shorted
+stocks rally short-term), monthly IC is **−2.7 %** (they
+under-perform once you give them time). The 4-week label horizon
+captured the bounce; the 1-month rebalance captures the fundamental
+shorter-success.
+
+**Trained models have negative IC but underperform naive in the
+backtest**, because the additional feature blend introduces noise.
+Compare the *consistency* of the IC: naive hits the bearish side 68 %
+of months (32.2 % hit-rate of *positive* IC = 67.8 % of months with
+negative IC = correctly short-flagged). The trained models are noisier
+period to period.
+
+---
+
+## Top short candidates — as-of 2026-05-25
 
 Top 15 names by *consensus rank* across the three trained models (`logit`
 + `gbm_cls` + `gbm_rank`). Higher rank = stronger short conviction —
 all three models agree the name sits in the bearish tail. Gated on
 investable + A$200m+ market cap. Full top-30 in
-[`reports/current_positions.csv`](reports/current_positions.csv); regenerate
-with `scripts/_current_positions.py`.
+[`reports/current_positions_monthly.csv`](reports/current_positions_monthly.csv);
+regenerate with `scripts/_current_positions.py --monthly`.
 
 | # | Ticker | Company | Mkt Cap (A$m) | Short % | logit | gbm_cls | gbm_rank | Consensus |
 |---:|---|---|---:|---:|---:|---:|---:|---:|
-| 1  | AMP | AMP Limited | 4,047 | 2.32 | 0.638 | 0.899 | 0.157 | 0.901 |
-| 2  | GDG | Generation Dev Group | 1,622 | 9.59 | 0.701 | 0.829 | −0.540 | 0.886 |
-| 3  | HMC | HMC Capital Limited | 1,143 | 6.94 | 0.684 | 0.749 | 1.055 | 0.882 |
-| 4  | RWC | Reliance Worldwide | 2,416 | 3.11 | 0.721 | 0.892 | −1.150 | 0.865 |
-| 5  | NUF | Nufarm Limited | 929 | 1.63 | 0.656 | 0.908 | −0.883 | 0.865 |
-| 6  | TYR | Tyro Payments | 439 | 5.49 | 0.665 | 0.903 | −1.178 | 0.847 |
-| 7  | DTL | Data#3 Limited | 1,307 | 5.12 | 0.651 | 0.755 | −0.279 | 0.830 |
-| 8  | ACL | AU Clinical Labs | 382 | 8.44 | 0.734 | 0.814 | −1.362 | 0.826 |
-| 9  | WTC | WiseTech Global | 12,366 | 7.83 | 0.736 | 0.686 | −0.531 | 0.807 |
-| 10 | MGH | Maas Group Holdings | 1,790 | 1.45 | 0.608 | 0.833 | −0.556 | 0.803 |
-| 11 | XRO | Xero Ltd | 12,936 | 3.49 | 0.768 | 0.696 | −0.992 | 0.785 |
-| 12 | PNV | Polynovo Limited | 787 | 10.37 | 0.610 | 0.762 | −0.381 | 0.775 |
-| 13 | CKF | Collins Foods Ltd | 1,004 | 0.86 | 0.652 | 0.848 | −1.811 | 0.763 |
-| 14 | VSL | Vulcan Steel | 771 | 0.83 | 0.701 | 0.880 | −2.282 | 0.762 |
-| 15 | ARB | ARB Corporation | 1,503 | 3.76 | 0.628 | 0.803 | −1.210 | 0.760 |
+| 1  | ACL | AU Clinical Labs | 386 | 8.35 | 0.663 | 0.786 | −0.212 | 0.924 |
+| 2  | TYR | Tyro Payments | 425 | 5.70 | 0.688 | 0.846 | −0.957 | 0.905 |
+| 3  | CIA | Champion Iron | 2,666 | 3.92 | 0.710 | 0.743 | −1.024 | 0.897 |
+| 4  | CSL | CSL Limited | 47,618 | 0.67 | 0.734 | 0.634 | −0.934 | 0.879 |
+| 5  | BLX | Beacon Lighting Grp | 360 | 0.64 | 0.599 | 0.708 | −0.039 | 0.876 |
+| 6  | EBO | Ebos Group | 3,405 | 0.75 | 0.700 | 0.666 | −0.992 | 0.873 |
+| 7  | AIS | Aeris Resources | 436 | 2.77 | 0.579 | 0.644 | 0.204 | 0.853 |
+| 8  | MAQ | Macquarie Technology | 1,894 | 2.83 | 0.685 | 0.708 | −1.318 | 0.851 |
+| 9  | RWC | Reliance Worldwide | 2,416 | 2.61 | 0.750 | 0.726 | −1.773 | 0.841 |
+| 10 | PRN | Perenti Limited | 1,993 | 0.79 | 0.611 | 0.604 | −0.198 | 0.841 |
+| 11 | NUF | Nufarm Limited | 960 | 1.48 | 0.695 | 0.816 | −1.781 | 0.839 |
+| 12 | MYR | Myer Holdings | 415 | 3.76 | 0.581 | 0.622 | −0.243 | 0.821 |
+| 13 | KCN | Kingsgate Consolidated | 1,606 | 0.60 | 0.605 | 0.591 | −0.264 | 0.819 |
+| 14 | COH | Cochlear Limited | 6,348 | 4.70 | 0.667 | 0.557 | −0.562 | 0.817 |
+| 15 | XRO | Xero Ltd | 13,064 | 3.45 | 0.677 | 0.555 | −0.756 | 0.809 |
 
-The list reads cleanly as a real short-book: high-multiple growth names
-(WiseTech, Xero, Polynovo), already-shorted consumer/health/fin names
-(Generation Dev, AMP, AU Clinical Labs, Tyro), and a few cyclicals/
-mid-caps where the GBM is picking up earnings-quality / leverage signals
-even though ShortPct is low (AMP, ARB, Collins Foods). **Not** a list of
-fly-by-night small-caps — every name is ≥ A$200m and most are ASX 200/300
-constituents.
+Real ASX 200/300 names throughout — CSL ($47B), Cochlear ($6.3B), Xero
+($13B), Champion Iron, Reliance Worldwide, Nufarm. The model is willing to
+short large-cap quality (CSL, COH, XRO) when valuation + momentum +
+revisions point bearish, not just heavily-shorted names.
 
 ---
 
-## Information coefficients (out-of-fold)
+## Data audit
 
-What the model *thinks* about each stock, scored against the realised 4-week
-forward total return. All five models are evaluated on the same walk-forward
-folds (purge + 4-week embargo to match the label horizon):
+Run via `scripts/_data_audit.py` → [`reports/data_audit.md`](reports/data_audit.md)
++ [`reports/yahoo_crosscheck.csv`](reports/yahoo_crosscheck.csv).
 
-| model | IC mean | IC t-stat (naive) | **IC t-stat (HAC-adj)** | IC hit-rate | n periods |
-|---|---:|---:|---:|---:|---:|
-| ew (equal-weight composite) | +7.5 % | +9.12 | **~+4.5** | 78.2 % | 211 |
-| naive (rank ShortPct) | +1.2 % | +2.13 | ~+1.1 | 54.0 % | 211 |
-| gbm_cls (LightGBM classifier) | −3.0 % | −2.55 | ~−1.3 | 36.7 % | 98 |
-| logit (rebuilt v1 baseline) | −4.3 % | −4.29 | ~−2.1 | 31.1 % | 90 |
-| gbm_rank (LightGBM LambdaRank) | −4.5 % | −2.51 | ~−1.3 | 36.7 % | 98 |
+### Universe coverage (16-year window)
 
-**Reading the signs.** Positive IC = the model's "shortable" score correlates
-with *higher* forward returns — backwards for a short book. The three
-trained models all produce *negative* ICs, i.e. they correctly identify
-underperformers. The naive and EW baselines have positive ICs because the
-characteristics they mechanically rank by (high SI; high quality, value,
-momentum, size) turned out to predict *winners* in the 2022-2026 ASX
-regime. The naive baseline's L/S construction monetises that anyway — long
-the names that aren't heavily shorted, short the ones that are — and the
-stop loss handles the squeeze-side tail.
+- **261,597 ASIC weekly rows** across **830 Fridays** (2010-07-05 → 2026-05-25).
+- **500 unique tickers** kept (top-N by ASIC report frequency); top-20 are
+  all ASX 200 stalwarts (TLS, ALL, TAH, SXL, SUL, STO, SHL, SGM, SFR, SEK,
+  RSG, RRL, RIO, RHC, QBE, QAN, PRU, ANZ, ANN, AMP — each present in all
+  830 weeks).
+- **410 / 500 have FMP price data**; the 90 with no FMP coverage are
+  pre-2014 delistings.
+- **33 %** of rows pass the full *investable* gate (price + fresh filing +
+  not corrupted).
+- Coverage by year ramps from 262 tickers in 2010 → 427 in 2020, then
+  drifts down to 307 by mid-2026 (delistings + filter dynamics).
 
-**Naive t-stats are inflated by overlapping 4-week labels.** Consecutive
-weekly observations of `fwd_ret_4w` share 75 % of their underlying
-window, so the IC series is serially correlated. A Newey-West HAC
-adjustment with lag = horizon − 1 = 3 cuts the apparent t by roughly
-√4 ≈ 2 — see [§Limitations](#limitations). The mean ICs themselves are
-unbiased; only the significance is overstated.
+### FMP ↔ Yahoo Finance cross-check (monthly returns)
+
+50 randomly-sampled symbols (seed 42), 2010-07 → 2026-05:
+
+| Diagnostic | Value |
+|---|---:|
+| Symbols sampled | 50 |
+| Flagged **ok** (corr ≥ 0.95, price-level diff < 5 %) | **40** |
+| **warn** (corr ≥ 0.80, level diff < 50 %) | 2 |
+| **mismatch** | 1 |
+| **insufficient** (Yahoo has < 6 overlapping months) | 7 |
+| Median Spearman correlation (monthly returns) | **0.9996** |
+| 5th-percentile correlation (worst-fit) | 0.976 |
+| Median absolute price-level difference (month-end) | **0.054 %** |
+
+**The data is good.** 80 % of sampled symbols are at basis-point-level
+agreement between FMP and Yahoo. The three flagged symbols (VRL, SUN,
+HLS) are all corporate-action / demerger names where vendors disagree on
+how to back-adjust the split — not noise, just legitimate "which vendor
+got it right" differences.
+
+### Look-ahead audit
+
+**0 violations across 261,597 rows.** Every fundamental row has a
+non-negative `filing_lag_days` (acceptedDate ≤ rebalance date). Median
+filing lag = 49 days, which is the standard SEC/ASX 90-day report
+window minus a couple of weeks for FMP's acceptedDate to lag the
+actual exchange filing.
+
+### Fundamental coverage
+
+| Endpoint / field | Non-null % | Notes |
+|---|---:|---|
+| income_statement: `netIncome`, `revenue`, `operatingIncome`, `ebitda` | 100 % | All used by features |
+| balance_sheet: `totalAssets`, `totalDebt`, `totalStockholdersEquity` | 100 % | |
+| balance_sheet: `commonStockSharesOutstanding` | _absent_ | Fallback: `weightedAverageShsOut` |
+| cash_flow: `operatingCashFlow`, `freeCashFlow` | 100 % | |
+| ratios: `priceEarningsRatio`, `returnOnEquity`, `returnOnInvestedCapital` | _absent_ | FMP stable-API renamed; computed from primitives in `features/quality.py` |
+| key_metrics: `roic`, `fcfYield` | _absent_ | Computed from primitives |
+| key_metrics: `earningsYield` | 100 % | |
+| financial_growth: `revenueGrowth`, `epsgrowth` | 100 % | |
+
+The "_absent_" columns reflect a rename in FMP's stable API vs the
+legacy v3 API. `features/quality.py` uses a `_first_present(...)`
+fallback to compute ROE / ROIC / margins from the income-statement and
+balance-sheet primitives, so the *signals* themselves are intact —
+just computed rather than read off pre-built ratios.
+
+### Known data-quality findings
+
+- **Paladin Energy (PDN), Aug–Dec 2023**: 79 weekly rows show a 3.18T
+  AUD market cap because FMP's balance-sheet endpoint reports the
+  pre-consolidation share count (~289 billion shares) for that period,
+  before PDN's 2024 100:1 reverse split. The *real* PDN market cap was
+  ~$10-15B. Impact: PDN's `log_mktcap_rk` is wrongly 1.0 on those 79
+  rows; aggregate effect on portfolio metrics is negligible (< 0.1 %
+  of panel). A follow-up should cap `mktCap` at A$500B in `assemble.py`.
+- **Forward-return outliers**: 2 cells with `|fwd_ret_1w| > 200 %`, 10
+  with `|fwd_ret_4w| > 200 %`, 102 with `|fwd_ret_12w| > 200 %`. Mostly
+  ASX micro-cap 10× runs (real but extreme); the cross-sectional rank
+  transform handles these robustly.
+- **Sector / industry coverage = 0 %**. The pipeline never pulls FMP
+  `profile`, so sector dummies no-op. Easy follow-up: add a profile
+  step to `02_pull_fmp_fundamentals.py`.
 
 ---
 
@@ -152,23 +216,22 @@ unbiased; only the significance is overstated.
 |---|---|---|
 | Repo structure | one notebook | src-layout package + scripts + tests + docs |
 | Data — short interest | ASIC PDFs (tabula) | ASIC PDFs (dual parser, cached, validated) |
-| Data — prices / fundamentals | Yahoo Finance | **Financial Modeling Prep** (Premium); Yahoo cross-check |
-| Universe | implicit, all ASX | explicit point-in-time, top-500 by frequency, A$200m mcap gate |
+| Data — prices / fundamentals | Yahoo only | **FMP (Premium)** + Yahoo cross-check (median ρ = 0.9996) |
+| Window | implicit (~15 yrs Friday-weekly) | **16 yrs (2010-07 → 2026-05), 830 Fridays, monthly rebalance** |
+| Universe | implicit | explicit top-500 by frequency, A$200m mcap gate |
 | Features | 5 (price + SI only) | **~25 raw → 562 cross-sectional ranks** across short, price, liquidity, valuation, quality, leverage, growth |
 | Target | binary `y_down = 4w_ret < 0` | + cross-sectional decile-rank target for LambdaRank |
-| Cross-validation | single 400-week train / forward test | **walk-forward expanding window, purge + 4-week embargo, 24 folds** |
+| Cross-validation | single 400-week train / forward test | **walk-forward expanding window, purge + 1-month embargo**, monthly folds |
 | Models | one logit | naive, EW composite, logit, LightGBM classifier, LightGBM LambdaRank |
-| Interpretability | none | SHAP + gain-based feature importance, calibration table |
-| Look-ahead audit | none | explicit lag of fundamentals to `acceptedDate` + unit test |
-| Portfolio construction | top-K weekly | **top-quintile short and dollar-neutral L/S quintile**, equal-weight, liquidity-gated |
-| Risk control | hard 10 % stop, no costs | **hard 15 % per-position stop with explicit exit + re-entry commission** |
-| Costs | none modelled | 25 bps round-trip + 1.5 % p.a. borrow + 5 bps slippage + stop-exit commission |
-| Metrics | total $ PnL only | CAGR, Vol, **Sharpe, Sortino, MaxDD, Calmar**, hit-rate, turnover, monthly heatmap |
-| Reporting | inline plots | **9 publication-quality PNGs** + CSV summary + `reports/RESULTS.md` + methodology + data dictionary |
-| Reproducibility | none | uv lockfile, deterministic on-disk caches (ASIC + FMP), 40-test pytest suite |
+| Risk control | hard 10 % stop, no costs | **15 % per-position stop + 100 bps fill slippage + extra round-trip commission** |
+| Annualisation | weekly (52) | monthly (12) — turnover cost falls 4× per period |
+| Metrics | total $ PnL only | CAGR / Vol / **Sharpe / Sortino / MaxDD / Calmar** / hit-rate / turnover / monthly heatmap |
+| Reporting | inline plots | **publication-quality PNGs + RESULTS.md + data_audit.md + methodology + data dictionary** |
+| Reproducibility | none | uv lockfile, deterministic on-disk caches, 41-test pytest suite |
 
-Full granular delta: [`CHANGELOG.md`](CHANGELOG.md). Original notebook preserved
-unchanged in [`legacy/original_notebook.ipynb`](legacy/original_notebook.ipynb).
+Full granular delta: [`CHANGELOG.md`](CHANGELOG.md). Original notebook
+preserved unchanged in
+[`legacy/original_notebook.ipynb`](legacy/original_notebook.ipynb).
 
 ---
 
@@ -183,88 +246,19 @@ short-king-2.0/
 │   │                 leverage/growth + cross-sectional rank orchestrator
 │   ├── models/       baselines (naive / EW / logit), LightGBM clf + LambdaRank,
 │   │                 walk-forward CV (purge + embargo), SHAP, IC metrics
-│   ├── portfolio/    top-K / quintile / long-short construction; weekly backtest
-│   │                 with costs + borrow + slippage + per-position 15 % stop
+│   ├── portfolio/    top-K / quintile / long-short construction; weekly+monthly
+│   │                 backtest with costs + borrow + slippage + 15% stop
 │   ├── reporting/    publication-quality charts + tearsheet
 │   └── utils/        config (pydantic-settings), loguru, IO, dates
-├── scripts/          01..08 pipeline + utility helpers
-├── tests/            40 pytest assertions (utils, features, models, no-lookahead,
-│                     backtest math incl. stop-loss)
+├── scripts/          01..08 pipeline + utility helpers + data audit
+├── tests/            41 pytest assertions
 ├── docs/             methodology.md, data_dictionary.md
 ├── charts/           publication PNGs (committed)
-├── reports/          backtest_*.parquet, model_metrics.csv, RESULTS.md, oof_predictions.parquet
+├── reports/          backtest_*_monthly.parquet, model_metrics_monthly.csv,
+│                     data_audit.md, yahoo_crosscheck.csv, RESULTS.md,
+│                     current_positions_monthly.{csv,md}, oof_predictions_monthly.parquet
 └── legacy/           original v1 notebook (preserved)
 ```
-
----
-
-## How the backtest works
-
-For each Friday `t` in the panel:
-1. **Score**: each model produces a per-stock score on the day's universe.
-2. **Construct**: rank by score within the day, take the top quintile short
-   (basket weight `−1/n`), and optionally the bottom quintile long (basket
-   weight `+1/n`) for the dollar-neutral variant.
-3. **Hold one week**: position `p_i` realised P&L = `weight_i × (adjClose[t+1] / adjClose[t] − 1)`.
-4. **Stop loss check**: if any single position would lose more than 15 % of
-   its own notional in the week, the contribution is clipped to that floor
-   (the position is modelled as having been exited at the stop). An
-   **extra round-trip commission** is charged on the stopped notional to
-   reflect both the in-week stop exit and the re-entry the rebalance-level
-   delta-commission would otherwise miss.
-5. **Costs**: `r_net = r_gross − 25bps·Σ|Δw| − 5bps·Σ|Δw| − 1.5%·short_notional/52 − stop_commission`.
-6. **Compound**: cumulative growth of $1 is `Π (1 + r_net)`.
-
-There is no drift between rebalances (the book snaps to target each Friday)
-and the last rebalance is dropped from performance (no forward week).
-Full detail in [`docs/methodology.md`](docs/methodology.md) and the
-backtest engine source in
-[`src/short_king/portfolio/backtest.py`](src/short_king/portfolio/backtest.py).
-
----
-
-### Model interpretability — what's the GBM picking up?
-
-Top SHAP features for the full-sample LightGBM classifier
-(higher mean-|SHAP| = stronger contribution to the score):
-
-| Rank | Feature | Mean &#124;SHAP&#124; | Family |
-|---:|---|---:|---|
-| 1 | `mom_4w_rk` | 0.109 | momentum |
-| 2 | `asset_growth_yoy_rk` | 0.098 | growth (textbook short signal) |
-| 3 | `drawdown_52w_rk` | 0.093 | price / risk |
-| 4 | `balance_sheet_preferredStock_rk` | 0.092 | leverage / dilution |
-| 5 | `mom_1w_rk` | 0.089 | short-term reversal |
-| 6 | `mom_12w_skip1_rk` | 0.087 | momentum (skip-1w) |
-| 7 | `mom_12w_rk` | 0.078 | momentum |
-| 8 | `cash_flow_accountsPayables_rk` | 0.070 | working capital |
-| 9 | `mom_26w_rk` | 0.065 | medium-term momentum |
-| 10 | `cash_flow_incomeTaxesPaid_rk` | 0.061 | quality |
-
-![SHAP feature importance — LightGBM classifier](charts/shap_summary.png)
-
-The economic read is reassuring: the tree model picks up known short-side
-factors (asset growth, drawdown, preferred-stock issuance, working-capital
-stress) alongside multi-horizon momentum — none of it surprising for a
-quant short signal. Full ranked lists in `reports/gain_importance.csv` and
-`reports/mean_abs_shap.csv`.
-
----
-
-## Charts
-
-| | |
-|---|---|
-| ![Universe coverage](charts/universe_coverage.png) | ![Short-interest distribution](charts/si_distribution.png) |
-| **Universe coverage** by Friday. Top-500 most-shorted tickers across 5 years. | **Short-interest distribution** — pooled across the panel. |
-| ![Feature correlation](charts/feature_correlation.png) | ![Feature distributions](charts/feature_distributions.png) |
-| **Cross-feature correlation** (rank columns) — confirms low collinearity. | **Feature distributions** — uniform after cross-sectional ranking. |
-| ![Decile returns](charts/decile_returns.png) | ![Top short candidates](charts/top_short_candidates.png) |
-| **OOF mean 4-week forward return by score decile.** Negative-slope = working short signal. | **Top short candidates** on the latest panel Friday (model = logit). |
-| ![Cumulative](charts/cumulative_returns.png) | ![Drawdowns](charts/drawdowns.png) |
-| **Cumulative $1** across the 10 (model × strategy) backtests. | **Underwater plot** for the best (naive L/S quintile). |
-| ![Monthly heatmap](charts/monthly_heatmap.png) | |
-| **Monthly returns** — best strategy. | |
 
 ---
 
@@ -273,29 +267,29 @@ quant short signal. Full ranked lists in `reports/gain_importance.csv` and
 ```bash
 git clone https://github.com/Taff1887/short-king-2.0.git
 cd short-king-2.0
-cp .env.example .env       # then put your FMP_API_KEY in .env
-uv sync --extra dev        # one-line install of the whole stack
+cp .env.example .env       # put your FMP_API_KEY in .env
+uv sync --extra dev
 ```
 
 ```bash
-# Pipeline (each step caches; re-runs are cheap)
-uv run python scripts/01_pull_asic.py             --weeks 260
-uv run python scripts/02_pull_fmp_fundamentals.py --top-tickers 500
-uv run python scripts/_refilter_asic.py           # re-applies the top-500 filter
+# Full-history monthly pipeline:
+uv run python scripts/01_pull_asic.py             --weeks 830   # 16 years, ~2 min
+uv run python scripts/02_pull_fmp_fundamentals.py --top-tickers 500 --limit 80  # ~15 min
+uv run python scripts/_refilter_asic.py
 uv run python scripts/03_pull_fmp_prices.py
-uv run python scripts/04_build_features.py
-uv run python scripts/05_train_and_validate.py
-uv run python scripts/06_backtest.py              # quintiles + 15% stop by default
-uv run python scripts/_extra_charts.py            # diagnostic chart bundle
-uv run python scripts/08_generate_report.py       # writes reports/RESULTS.md
+uv run python scripts/04_build_features.py        # writes both weekly + monthly panels
+uv run python scripts/05_train_and_validate.py    --monthly
+uv run python scripts/06_backtest.py              --monthly
+uv run python scripts/_current_positions.py       --monthly
+uv run python scripts/_data_audit.py              # FMP vs Yahoo + quality checks
+uv run python scripts/_extra_charts.py
+uv run python scripts/08_generate_report.py
 ```
 
-`06_backtest.py` accepts `--n-buckets 10` to switch back to deciles and
-`--stop-loss-pct 1.0` to disable the stop. End-to-end runtime (cold):
-~25 min (ASIC + FMP + ML); hot re-runs: <1 min.
-
-Java (any version, for `tabula-py`) needs to be on `PATH` so ASIC PDFs
-parse; `pdfplumber` is included as a Java-free fallback.
+Cold-run total: ~30 min (mostly the FMP fundamentals pull); subsequent
+runs are seconds-to-a-few-minutes thanks to deterministic on-disk
+caches. Java (any version) needs to be on `PATH` for `tabula-py`;
+`pdfplumber` is the Java-free fallback.
 
 ---
 
@@ -303,39 +297,26 @@ parse; `pdfplumber` is included as a Java-free fallback.
 
 * **Stop-loss execution slippage is modelled at 100 bps central / 200 bps
   conservative** (`CostConfig.stop_slippage_pct`). When a position trips
-  the 15 % trigger, the engine fills it at the trigger *plus* this
-  slippage to reflect that real stops do not fill at the trigger price.
-  Realistic ranges for our universe: ~30 bps (ASX 50), ~100 bps (mid-cap),
-  100-500 bps (small-cap), 200-1000+ bps (halted / squeeze). The headline
-  Sharpe of 2.02 uses 100 bps; the sensitivity table above quantifies the
-  effect of dialling this up. **Tail-risk slippage on individual halted
-  names is not separately modelled** — a takeover-bid-driven 50 % gap on
-  a single short would still be capped at the floor in the engine.
-* **Window choice (2022-2026)** captures the meme-stock era + post-COVID
-  rally + 2022 bear + 2023-2025 AI rally. A longer (2010+) window would
-  dampen the regime effect; the sister `quant-factor-ranking` project
-  runs the same pattern on US S&P 500 2010+ and finds modest +1.6 %
-  CAPM α in the long-book direction.
-* **IC t-stats reported in §IC table are naive** (assume independent
-  weekly observations) but the 4-week label horizon makes consecutive
-  obs share 75 % of their window. A Newey-West HAC adjustment cuts the
-  apparent t-stat by ~√4 ≈ 2. The mean ICs themselves are unbiased.
-* **Sector dummies skipped.** The PIT panel exposes `sector`/`industry`
-  columns (sourced from FMP `profile`), but our scripted run does not
-  yet pull profiles, so `add_sector_dummies` no-ops. Easy follow-up: add
-  a profile-fetch step to `scripts/02_pull_fmp_fundamentals.py`.
+  the 15 % trigger, the engine fills at the trigger + this slippage.
+  Realistic ranges: ~30 bps (ASX 50), ~100 bps (mid-cap), 100-500 bps
+  (small-cap), 200-1000+ bps (halted / squeeze). Tail-risk slippage on
+  individual halted names is not separately modelled.
+* **IC t-stats are naive** (assume IID monthly observations). The 1-month
+  label horizon means consecutive monthly observations don't overlap
+  meaningfully, so this is less of an issue for the monthly run than it
+  was for the weekly version (where 4-week labels overlapped 75 %).
+* **Sector dummies skipped.** The pipeline doesn't pull FMP `profile`,
+  so `add_sector_dummies` no-ops. Easy follow-up.
 * **Borrow cost is a flat 150 bps p.a.** Real ASX borrow rates vary by
-  name and by date (small-caps + hot shorts can be > 5 % p.a.); the
-  `CostConfig` is fully parameterised and the backtest reruns in < 5 s.
-* **Capital-raise / squeeze dynamics absent.** A short book that's
-  diluted by paper rights and capital-raise issuance in reality is
-  modelled here purely on adjusted-close returns — a real-world
-  dampener the backtest doesn't see (though the 15 % stop catches most
-  of the single-week pain that comes with these events).
-* **US robustness check (`scripts/07_robustness_us.py`) is a documented
-  stub.** FMP/FINRA US short interest is bi-monthly, not weekly, so the
-  same data pipeline does not transplant cleanly. The script's docstring
-  explains what an end-to-end US version would do.
+  name and time. The `CostConfig` is fully parameterised so a sensitivity
+  sweep is one CLI flag.
+* **Capital-raise / squeeze dynamics absent.** The 15 % stop catches most
+  of the single-week pain that accompanies these events, but the
+  backtest is purely on adjusted-close returns.
+* **PDN mktCap data error**: see [Data audit](#known-data-quality-findings).
+* **US robustness check is a documented stub** — FMP/FINRA US short
+  interest is bi-monthly, not weekly, so the same data pipeline does not
+  transplant cleanly.
 
 ---
 

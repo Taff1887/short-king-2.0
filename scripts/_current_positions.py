@@ -11,6 +11,8 @@ Outputs:
 
 from __future__ import annotations
 
+import argparse
+
 import numpy as np
 import pandas as pd
 
@@ -63,9 +65,17 @@ def _consensus_rank(panel: pd.DataFrame, cols: list[str]) -> pd.Series:
 
 
 def main() -> None:
+    p = argparse.ArgumentParser(description=__doc__)
+    p.add_argument("--monthly", action="store_true",
+                   help="Read oof_predictions_monthly.parquet and write "
+                        "current_positions_monthly.{csv,md}.")
+    args = p.parse_args()
     settings.ensure_dirs()
 
-    oof = read_parquet(settings.reports_dir / "oof_predictions.parquet")
+    oof_name = "oof_predictions_monthly.parquet" if args.monthly else "oof_predictions.parquet"
+    out_csv_name = "current_positions_monthly.csv" if args.monthly else "current_positions.csv"
+    out_md_name = "current_positions_monthly.md" if args.monthly else "current_positions.md"
+    oof = read_parquet(settings.reports_dir / oof_name)
     clean = read_parquet(settings.processed_dir / "master_clean.parquet")
 
     as_of = _latest_full_date(oof)
@@ -124,7 +134,7 @@ def main() -> None:
     ]
     csv_cols = [c for c in csv_cols if c in out.columns]
     out_csv = out[csv_cols].head(TOP_N_CSV)
-    csv_path = settings.reports_dir / "current_positions.csv"
+    csv_path = settings.reports_dir / out_csv_name
     out_csv.to_csv(csv_path, index=False)
     logger.info(f"wrote {csv_path} ({len(out_csv)} rows)")
 
@@ -149,7 +159,7 @@ def main() -> None:
     if "sector" in md_df.columns:
         md_df["sector"] = md_df["sector"].fillna("-").replace({"nan": "-", "None": "-"})
 
-    md_path = settings.reports_dir / "current_positions.md"
+    md_path = settings.reports_dir / out_md_name
     header = (
         f"# Top {TOP_N_MD} short candidates — as of {as_of.date()}\n\n"
         f"Ranked by **consensus rank** of three trained models (logit + GBM "

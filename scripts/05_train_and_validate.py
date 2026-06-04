@@ -65,6 +65,13 @@ def _parse_args() -> argparse.Namespace:
     p.add_argument("--test-weeks", type=int, default=4)
     p.add_argument("--embargo-weeks", type=int, default=4)
     p.add_argument("--shap-n-sample", type=int, default=2000)
+    p.add_argument(
+        "--monthly", action="store_true",
+        help="Use features_monthly.parquet (last-Friday-of-month panel). "
+             "Sets defaults to min-train=36 / test=6 / embargo=1 months "
+             "unless explicitly overridden. Adjusts OOF parquet name to "
+             "reports/oof_predictions_monthly.parquet.",
+    )
     return p.parse_args()
 
 
@@ -167,7 +174,33 @@ def main() -> int:
     args = _parse_args()
     settings.ensure_dirs()
 
-    feat_path = settings.processed_dir / "features.parquet"
+    # ---- Monthly vs weekly source -------------------------------------------
+    # The --monthly switch picks features_monthly.parquet (last-Friday-of-month
+    # rows), retunes the walk-forward defaults to monthly units, and routes
+    # the OOF parquet to a separate filename so weekly + monthly runs don't
+    # clobber each other.
+    if args.monthly:
+        feat_filename = "features_monthly.parquet"
+        oof_filename = "oof_predictions_monthly.parquet"
+        metrics_filename = "model_metrics_monthly.csv"
+        # Override the defaults only when the user didn't pass an explicit
+        # value (default sentinels are the weekly numbers).
+        if args.min_train_weeks == 156:
+            args.min_train_weeks = 36
+        if args.test_weeks == 4:
+            args.test_weeks = 6
+        if args.embargo_weeks == 4:
+            args.embargo_weeks = 1
+        logger.info(
+            "05: --monthly enabled | "
+            f"min_train={args.min_train_weeks}m test={args.test_weeks}m embargo={args.embargo_weeks}m"
+        )
+    else:
+        feat_filename = "features.parquet"
+        oof_filename = "oof_predictions.parquet"
+        metrics_filename = "model_metrics.csv"
+
+    feat_path = settings.processed_dir / feat_filename
     if not feat_path.exists():
         logger.error(f"{feat_path} not found — must run 04_build_features.py first")
         return 1
@@ -313,7 +346,7 @@ def main() -> int:
         ],
         ignore_index=True,
     )
-    write_parquet(oof, settings.reports_dir / "oof_predictions.parquet")
+    write_parquet(oof, settings.reports_dir / oof_filename)
     logger.info(f"oof_predictions: {len(oof):,} rows across {oof['model'].nunique()} models")
 
     # --- Per-model metrics ---------------------------------------------------
@@ -335,7 +368,7 @@ def main() -> int:
             }
         )
     metrics_df = pd.DataFrame(rows).sort_values("ic_mean", ascending=False)
-    metrics_df.to_csv(settings.reports_dir / "model_metrics.csv", index=False)
+    metrics_df.to_csv(settings.reports_dir / metrics_filename, index=False)
     logger.info(f"model_metrics:\n{metrics_df.to_string(index=False)}")
 
     # --- Calibration table for the GBM classifier ----------------------------

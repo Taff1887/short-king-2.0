@@ -94,6 +94,9 @@ class CostConfig:
     bench_borrow_for_longs: bool = False
     stop_loss_pct: float | None = 0.15
     stop_slippage_pct: float = 0.01
+    # Annualisation factor: 52 for weekly rebalance, 12 for monthly, 4 for
+    # quarterly. Used by ``_summarise_returns`` for CAGR / vol / Sharpe / borrow.
+    periods_per_year: int = 52
 
 
 @dataclass
@@ -212,6 +215,8 @@ def _summarise_returns(
     gross: pd.Series,
     turnover: pd.Series,
     bench: pd.Series | None = None,
+    *,
+    periods_per_year: int = PERIODS_PER_YEAR,
 ) -> pd.Series:
     """Roll the per-week net-return series into a one-line portfolio summary.
 
@@ -236,17 +241,17 @@ def _summarise_returns(
 
     cum = float((1.0 + r).prod())
     total_return = cum - 1.0
-    years = n / PERIODS_PER_YEAR
+    years = n / periods_per_year
     cagr = cum ** (1.0 / years) - 1.0 if years > 0 else np.nan
 
     vol = float(r.std(ddof=1))
-    ann_vol = vol * np.sqrt(PERIODS_PER_YEAR) if vol > 0 else np.nan
-    sharpe = (r.mean() / vol) * np.sqrt(PERIODS_PER_YEAR) if vol > 0 else np.nan
+    ann_vol = vol * np.sqrt(periods_per_year) if vol > 0 else np.nan
+    sharpe = (r.mean() / vol) * np.sqrt(periods_per_year) if vol > 0 else np.nan
 
     # Sortino - downside deviation only (negative returns vs zero target).
     downside = r.clip(upper=0.0)
     dd_vol = float(np.sqrt((downside ** 2).mean()))
-    sortino = (r.mean() / dd_vol) * np.sqrt(PERIODS_PER_YEAR) if dd_vol > 0 else np.nan
+    sortino = (r.mean() / dd_vol) * np.sqrt(periods_per_year) if dd_vol > 0 else np.nan
 
     # Max drawdown on the equity curve.
     eq = (1.0 + r).cumprod()
@@ -258,7 +263,7 @@ def _summarise_returns(
     # Turnover statistics (turnover here is the per-rebalance one-way figure
     # = sum |delta_w| / 2; annualised by 52).
     to_avg = float(turnover.mean()) if len(turnover) else np.nan
-    to_ann = to_avg * PERIODS_PER_YEAR if pd.notna(to_avg) else np.nan
+    to_ann = to_avg * periods_per_year if pd.notna(to_avg) else np.nan
 
     # Gross vs net summary for a quick cost-drag readout.
     g = gross.dropna()
@@ -277,7 +282,7 @@ def _summarise_returns(
         if len(joined) >= 12 and joined["b"].std(ddof=1) > 0:
             slope, intercept = np.polyfit(joined["b"].to_numpy(), joined["p"].to_numpy(), 1)
             beta = float(slope)
-            alpha_pa = float(intercept) * PERIODS_PER_YEAR
+            alpha_pa = float(intercept) * periods_per_year
 
     return pd.Series(
         {
@@ -426,7 +431,7 @@ def backtest_weekly(
     # rate = annual / 52.
     short_notional = new_w.clip(upper=0.0).abs().sum(axis=1)
     long_notional = new_w.clip(lower=0.0).sum(axis=1)
-    borrow_rate_wk = (cfg.annual_borrow_pct / 100.0) / PERIODS_PER_YEAR
+    borrow_rate_wk = (cfg.annual_borrow_pct / 100.0) / cfg.periods_per_year
     borrow = short_notional * borrow_rate_wk
     if cfg.bench_borrow_for_longs:
         borrow = borrow + long_notional * borrow_rate_wk
@@ -469,6 +474,7 @@ def backtest_weekly(
         pd.Series(gross_per_week.to_numpy(), index=held_dates, name="ret_gross"),
         pd.Series(turnover.to_numpy(), index=held_dates, name="turnover"),
         bench=bench_aligned,
+        periods_per_year=cfg.periods_per_year,
     )
     # Stop-loss diagnostics piggy-backed onto the summary Series so they
     # surface in the reports/backtest_summary.csv aggregation step.

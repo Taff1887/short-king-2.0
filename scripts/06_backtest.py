@@ -51,6 +51,9 @@ def _parse_args() -> argparse.Namespace:
                         "notional). 0.01 = 100bps central estimate for the top-500 ASX "
                         "short-interest universe; 0.02 = conservative headline. Stops "
                         "exit at the trigger plus this slippage. Default 0.01.")
+    p.add_argument("--monthly", action="store_true",
+                   help="Read OOF predictions from oof_predictions_monthly.parquet, set "
+                        "periods_per_year=12, and write backtest_summary_monthly.csv.")
     return p.parse_args()
 
 
@@ -108,9 +111,21 @@ def main() -> int:
     args = _parse_args()
     settings.ensure_dirs()
 
-    oof_path = settings.reports_dir / "oof_predictions.parquet"
+    if args.monthly:
+        oof_filename = "oof_predictions_monthly.parquet"
+        feat_filename = "features_monthly.parquet"
+        bt_prefix = "backtest_monthly"
+        summary_filename = "backtest_summary_monthly.csv"
+        periods_per_year = 12
+    else:
+        oof_filename = "oof_predictions.parquet"
+        feat_filename = "features.parquet"
+        bt_prefix = "backtest"
+        summary_filename = "backtest_summary.csv"
+        periods_per_year = 52
+    oof_path = settings.reports_dir / oof_filename
     clean_path = settings.processed_dir / "master_clean.parquet"
-    feat_path = settings.processed_dir / "features.parquet"
+    feat_path = settings.processed_dir / feat_filename
     if not oof_path.exists():
         logger.error(f"{oof_path} not found - must run 05_train_and_validate.py first")
         return 1
@@ -139,6 +154,7 @@ def main() -> int:
         slippage_bps=args.slippage_bps,
         stop_loss_pct=args.stop_loss_pct if args.stop_loss_pct < 1.0 else None,
         stop_slippage_pct=args.stop_slippage_pct,
+        periods_per_year=periods_per_year,
     )
 
     # Strategy labels follow the bucket count: 5 -> quintile, 10 -> decile,
@@ -178,7 +194,7 @@ def main() -> int:
                 cost_config=cost,
             )
 
-            out_path = settings.reports_dir / f"backtest_{model_name}_{strategy_name}.parquet"
+            out_path = settings.reports_dir / f"{bt_prefix}_{model_name}_{strategy_name}.parquet"
             write_parquet(result.returns, out_path)
 
             summary_rows.append(_summary_row(model_name, strategy_name, result))
@@ -197,7 +213,7 @@ def main() -> int:
 
     # Aggregate summary across (model, strategy).
     summary_df = pd.DataFrame(summary_rows)
-    summary_path = settings.reports_dir / "backtest_summary.csv"
+    summary_path = settings.reports_dir / summary_filename
     summary_df.to_csv(summary_path, index=False)
     logger.info(f"wrote {summary_path.name} with {len(summary_df)} (model, strategy) rows")
 
@@ -210,14 +226,17 @@ def main() -> int:
 
     chart_jobs = [
         ("cumulative_returns.png",
-         lambda: rc.chart_cumulative_returns(returns_frame, settings.charts_dir / "cumulative_returns.png")),
+         lambda: rc.chart_cumulative_returns(returns_frame,
+             settings.charts_dir / ("cumulative_returns_monthly.png" if args.monthly else "cumulative_returns.png"))),
     ]
     if best_series is not None and len(best_series) > 0:
         chart_jobs += [
             ("drawdowns.png",
-             lambda: rc.chart_drawdowns(best_series, settings.charts_dir / "drawdowns.png")),
+             lambda: rc.chart_drawdowns(best_series,
+                 settings.charts_dir / ("drawdowns_monthly.png" if args.monthly else "drawdowns.png"))),
             ("monthly_heatmap.png",
-             lambda: rc.chart_monthly_heatmap(best_series, settings.charts_dir / "monthly_heatmap.png")),
+             lambda: rc.chart_monthly_heatmap(best_series,
+                 settings.charts_dir / ("monthly_heatmap_monthly.png" if args.monthly else "monthly_heatmap.png"))),
         ]
     for name, fn in chart_jobs:
         try:
