@@ -242,6 +242,22 @@ def assemble_pit_panel(
         asic["ReleaseDate"] = pd.to_datetime(asic["ReleaseDate"]).dt.normalize()
     asic["Symbol"] = asic["Ticker"].astype(str).str.upper().str.strip() + ".AX"
 
+    # --- 4-business-day lag: swap Date and ReleaseDate ----------------------
+    # ASIC publishes the Friday "release" reporting positions as-of the
+    # PRIOR MONDAY (4 BDays earlier). The previous version of the pipeline
+    # used the Monday "as-of" date as the trading anchor - meaning the
+    # backtest implicitly assumed it could trade on Monday's adjClose
+    # knowing the Monday position. That's a 4-BDay look-ahead: in real life
+    # we only learn the Monday position when the report drops on Friday.
+    #
+    # Fix: use Friday (ReleaseDate) as the rebalance date. Prices and
+    # forward returns join on Friday's close; positions are the as-of
+    # Monday snapshot but tradable only at Friday. The original Monday
+    # date is preserved as ``AsOfDate`` for diagnostic / audit purposes.
+    if "ReleaseDate" in asic.columns:
+        asic["AsOfDate"] = asic["Date"]      # Monday positions snapshot
+        asic["Date"] = asic["ReleaseDate"]   # Friday tradable date
+
     # --- Prices: as-of attach ---------------------------------------------
     px_attach = _asof_join_price(asic, prices_long)
     panel = asic.merge(px_attach, on=["Symbol", "Date"], how="left")
@@ -418,6 +434,23 @@ def assemble_pit_panel(
         f"| shares*price fallback={n_fb_used:,}"
     )
 
+    # Physical-impossibility sanity: no ASX-listed company has ever reached
+    # A$300B (peak BHP ≈ A$250B mid-2022). Any row above that is FMP source-
+    # data error (e.g. enterprise_values reports pre-consolidation shares for
+    # certain tickers in certain quarters). Null these rows rather than
+    # silently feeding them into log_mktcap / liquidity / portfolio
+    # construction. No ticker-specific hardcoding.
+    sanity_cap_aud = 3e11  # A$300B
+    bad_mask = panel["mktCap"] > sanity_cap_aud
+    n_bad = int(bad_mask.sum())
+    if n_bad:
+        bad_tickers = panel.loc[bad_mask, "Ticker"].value_counts().head(5).to_dict()
+        logger.warning(
+            f"mktCap sanity: NaN'd {n_bad:,} rows > A$300B "
+            f"(top affected tickers: {bad_tickers})"
+        )
+        panel.loc[bad_mask, "mktCap"] = np.nan
+
     # --- Investable flag --------------------------------------------------
     panel["filing_stale_quarters"] = panel["filing_lag_days"] / DAYS_PER_QUARTER
     has_price = panel["adjClose"].notna()
@@ -430,7 +463,8 @@ def assemble_pit_panel(
     # --- Final column order: declared schema first, then fundamentals -----
     panel = panel.rename(columns={"Symbol": "Symbol"})
     declared = [
-        "Date",
+        "Date",          # Friday (release date) - the tradable rebalance date
+        "AsOfDate",      # Monday (positions snapshot) - 4 BDays before Date
         "ReleaseDate",
         "Ticker",
         "Symbol",

@@ -2,11 +2,12 @@
 
 > Cross-sectional short-selling on the Australian Securities Exchange.
 > **500-stock universe, 15 years 11 months (16 June 2010 → 29 May 2026)
-> of weekly ASIC disclosures**, end-of-month rebalance, FMP fundamentals,
-> Yahoo Finance prices (cross-checked vs FMP at median ρ = 0.9996), 5 models
-> walk-forward CV'd with purge + embargo, **36-month pure out-of-sample
-> holdout**, costed backtest with 15 % per-position stop + 100 bps fill
-> slippage.
+> of weekly ASIC disclosures**, **Friday-release end-of-month rebalance**
+> (4-business-day lag respected — we trade on the day positions become
+> known, not the as-of date), FMP fundamentals, Yahoo Finance prices
+> (cross-checked vs FMP at median ρ = 0.9996), 5 models walk-forward CV'd
+> with purge + embargo, **36-month pure out-of-sample holdout**, costed
+> backtest with 15 % per-position stop + 100 bps fill slippage.
 
 A from-scratch rebuild of an earlier ASX short-interest prototype
 ([Taff1887/short-king](https://github.com/Taff1887/short-king)) — a single
@@ -29,23 +30,46 @@ exit-and-re-entry commission. Annualisation factor = 12 (monthly).
 
 ### Dollar-neutral long-short quintile (long bottom 20 %, short top 20 % by score)
 
-| Model | **IS Sharpe** | **OOS Sharpe** | OOS CAGR | OOS MaxDD | OOS Hit-rate | OOS Sortino |
-|---|---:|---:|---:|---:|---:|---:|
-| **naive** (rank ShortPct) | 1.93 | **3.37** | **+45.3 %** | **−4.9 %** | **88.6 %** | 8.9 |
-| **logit** (rebuilt v1) | 2.52 | **3.00** | +50.6 % | −5.4 % | 80.0 % | 14.4 |
-| gbm_rank (LightGBM LambdaRank) | 2.37 | 2.31 | +47.5 % | −11.6 % | 74.3 % | 6.0 |
-| gbm_cls (LightGBM binary) | 1.82 | 1.81 | +22.5 % | −10.7 % | 77.1 % | 4.0 |
-| ew (long-bias composite) | 0.89 | 1.31 | +23.9 % | −9.5 % | 60.0 % | 3.3 |
+| Model | **IS Sharpe** | **OOS Sharpe** | OOS CAGR | OOS MaxDD | OOS Hit-rate |
+|---|---:|---:|---:|---:|---:|
+| **naive** (rank ShortPct) | 2.00 | **3.85** | **+44.9 %** | **−4.2 %** | 88.6 % |
+| **logit** (rebuilt v1) | 2.59 | **2.80** | +47.1 % | −6.5 % | 80.0 % |
+| gbm_rank (LightGBM LambdaRank) | 2.47 | 2.23 | +47.4 % | −15.0 % | 74.3 % |
+| gbm_cls (LightGBM binary) | 1.89 | 1.63 | +19.9 % | −11.4 % | 77.1 % |
+| ew (long-bias composite) | 0.77 | 1.41 | +25.5 % | −10.9 % | 60.0 % |
 
 ### Top-quintile short only (no long leg)
 
 | Model | IS Sharpe | OOS Sharpe | OOS CAGR | OOS MaxDD |
 |---|---:|---:|---:|---:|
-| logit | 0.79 | 1.52 | +31.3 % | −10.2 % |
-| gbm_rank | 1.03 | 1.47 | +32.6 % | −18.2 % |
-| gbm_cls | 0.31 | 0.79 | +12.6 % | −17.6 % |
-| naive | 0.26 | 0.63 | +9.9 % | −15.3 % |
-| ew | −0.61 | −0.58 | −8.0 % | −31.9 % |
+| logit | 0.59 | 1.42 | +29.7 % | −12.4 % |
+| gbm_rank | 0.97 | 1.31 | +32.1 % | −22.6 % |
+| gbm_cls | 0.32 | 0.74 | +13.4 % | −18.8 % |
+| naive | 0.40 | 0.62 | +10.4 % | −16.1 % |
+| ew | −0.55 | −0.73 | −9.5 % | −33.5 % |
+
+### Stop-loss is structural, not cosmetic
+
+Side-by-side OOS Sharpe with the default 15 % stop vs `--stop-loss-pct 1.0`
+(disabled). Same panel, same costs, same Friday rebalance:
+
+| Model | OOS Sharpe (with stop) | OOS Sharpe (no stop) | Δ Sharpe | OOS MaxDD (with) | OOS MaxDD (no) |
+|---|---:|---:|---:|---:|---:|
+| **naive** | **3.85** | **0.92** | +2.93 | −4.2 % | **−10.8 %** |
+| **logit** | **2.80** | 0.24 | +2.56 | −6.5 % | **−37.1 %** |
+| gbm_rank | 2.23 | −0.21 | +2.44 | −15.0 % | **−51.6 %** |
+| gbm_cls | 1.63 | −1.11 | +2.74 | −11.4 % | **−44.4 %** |
+| ew | 1.41 | 0.08 | +1.33 | −10.9 % | **−33.1 %** |
+
+Disabling the stop turns *every* trained model except naive into a
+negative-Sharpe strategy in OOS. The drawdown numbers tell the story:
+without the stop, the L/S quintile would have eaten 33-52 % single-name-
+driven drawdowns. The stop fires on ~17 % of OOS short positions (1 in 6),
+caps each at −16 % per position, and converts a sub-1-Sharpe strategy
+into a 2-3.85 Sharpe one. Full sensitivity sweep across stop slippage
+0-2 % is in
+[`reports/stop_comparison.md`](reports/stop_comparison.md) /
+[`reports/stop_sensitivity.csv`](reports/stop_sensitivity.csv).
 
 ![Cumulative growth of $1 — solid = quintile-short, dotted = long-short](charts/cumulative_returns_monthly.png)
 
@@ -93,19 +117,22 @@ benefits from the long leg.
 
 ## Methodology
 
-### 1. Universe and rebalance
+### 1. Universe and rebalance — Friday-release dates (4-BDay lag respected)
 
 * **ASIC daily aggregate short-position reports**: weekly, Friday-anchored
-  (the earliest archived report we found is **16 June 2010**;
-  the regime started 1 June 2010 but the URL format we use stabilised
-  mid-June).
-* The data we ingest covers **2010-07-05 → 2026-05-29**, **192
-  end-of-month rebalance dates** (one per calendar month).
-* Each rebalance date is the last **ASIC release** in the calendar month
-  — **by construction a trading day** (ASIC only publishes Mon-Fri,
-  skipping public holidays). 182 of the 192 are Mondays (the *as-of*
-  date 4 business days before each Friday release); the other 10 are
-  Fridays where holidays pushed the as-of forward.
+  (the earliest archived report we found is **16 June 2010**; regime
+  started 1 June 2010 but the URL format we use stabilised mid-June).
+* Each ASIC release on Friday covers positions **as-of the prior
+  Monday** (4 business days earlier). The earlier version of this pipeline
+  used the Monday "as-of" date as the trading anchor — but a trader
+  doesn't *know* Monday's positions until Friday. **The current
+  pipeline rebalances on the Friday release**, using Friday's adjusted
+  close as the entry price. The Monday as-of date is preserved as
+  `AsOfDate` for diagnostic purposes only.
+* End-of-month rebalance = the last ASIC release in each calendar month —
+  by construction a trading day. **192 dates, day-of-week mix:
+  180 Fridays, 10 Thursdays, 2 Wednesdays** (the non-Fridays are months
+  where Easter / Christmas / King's Birthday pushed the release forward).
 * Universe = **top 500 ASX tickers by ASIC-report frequency** over the
   full 16 years, gated at ≥ A$200 m market cap on each rebalance.
 
@@ -165,7 +192,7 @@ fundamentals.
 ## OOS trade-level analysis — the actual short book
 
 Reconstructed every short position from the OOS holdout (2023-06 → 2026-05,
-**2,085 monthly positions across 206 unique tickers**, model = `logit`),
+**2,089 monthly positions across 224 unique tickers**, model = `logit`),
 applied the same 15 % stop + 100 bps slippage + commission + borrow as the
 headline backtest, and aggregated by ticker. Full per-position table is at
 [`reports/oos_short_positions.csv`](reports/oos_short_positions.csv) and
@@ -175,12 +202,11 @@ the per-ticker summary is at
 `scripts/_oos_trades.py --model logit`.
 
 **Aggregate OOS stats (short leg only):**
-- **Total short-leg P&L**: +101.2 % of book across 2,085 monthly short positions
-- **Per-position win-rate**: 54.9 % (a coin-flip that pays off because winners are bigger than losers)
-- **Median per-position return**: +2.63 %
-- **Stop-fire rate**: 16.9 % of positions clipped at the −16 % floor — i.e. the stop kicked in roughly 1 short in 6
-- **Best single month**: IMU +42.3 % (the stock fell 42 % in one month)
-- **Worst single month**: PLS −16.0 % (capped by the stop; raw move was −21 %)
+- **Total short-leg cumulative P&L**: ~+95 % of book across 2,089 monthly short positions
+- **Per-position win-rate**: ~55 % (winners are bigger than losers)
+- **Stop-fire rate**: ~17 % of positions clipped at the −16 % floor — 1 in 6
+- **Best single month**: CXL **+49 %** (Calix fell 49 % in one month)
+- **Worst single month**: −16 % (capped by the stop; pre-cap moves were as bad as +60 %, i.e. the stock rallied 60 % against the short)
 
 ### Top 10 winning shorts
 
@@ -190,46 +216,47 @@ the per-ticker summary is at
 
 | # | Ticker | Company | n months shorted | total P&L (% book) | avg trade | best month | hit-rate | n stops | avg SI % | first → last |
 |---:|---|---|---:|---:|---:|---:|---:|---:|---|
-| 1 | IMU | Imugene | 32 | **+5.42 %** | +10.8 % | +42.3 % | 75 % | 4 | 4.5 | 2023-07 → 2026-03 |
-| 2 | CXL | Calix | 32 | +4.97 % | +10.0 % | +46.3 % | 72 % | 5 | 2.5 | 2023-06 → 2026-04 |
-| 3 | BRN | BrainChip Holdings | 32 | +3.90 % | +8.1 % | +47.4 % | 63 % | 3 | 3.8 | 2023-06 → 2026-03 |
-| 4 | ERA | Energy Resources of Australia | 7 | +3.89 % | +34.3 % | +85.7 % | 86 % | 0 | 0.0 | 2024-03 → 2024-09 |
-| 5 | IPD | Impedimed | 16 | +3.79 % | +14.5 % | +60.0 % | 81 % | 1 | 0.6 | 2024-05 → 2026-04 |
-| 6 | PPK | PPK Group | 25 | +3.68 % | +9.4 % | +29.6 % | 72 % | 1 | 0.2 | 2023-06 → 2026-04 |
-| 7 | LKE | Lake Resources | 26 | +3.65 % | +9.2 % | +45.0 % | 65 % | 4 | 1.9 | 2023-06 → 2025-12 |
-| 8 | BOT | Botanix Pharmaceuticals | 17 | +3.61 % | +13.0 % | +57.6 % | 71 % | 0 | 2.3 | 2024-06 → 2026-02 |
-| 9 | PEN | Peninsula Energy | 24 | +3.30 % | +9.0 % | +45.9 % | 50 % | 2 | 2.1 | 2023-06 → 2025-12 |
-| 10 | NMT | Neometals | 16 | +2.87 % | +11.5 % | +36.1 % | 69 % | 1 | 1.8 | 2023-06 → 2025-01 |
+| 1 | CXL | Calix | 30 | **+5.10 %** | +10.8 % | +49.0 % | 67 % | 5 | 2.5 | 2023-06 → 2026-04 |
+| 2 | CCX | City Chic Collective | 17 | +4.05 % | +14.8 % | +60.7 % | 71 % | 1 | 0.6 | 2024-01 → 2026-03 |
+| 3 | ERA | Energy Resources of Australia | 7 | +3.74 % | +33.1 % | +84.4 % | 86 % | 1 | 0.0 | 2024-03 → 2024-09 |
+| 4 | NMT | Neometals | 16 | +3.53 % | +14.0 % | +38.0 % | 81 % | 1 | 1.6 | 2023-06 → 2025-06 |
+| 5 | LOT | Lotus Resources | 16 | +3.37 % | +12.9 % | +57.6 % | 63 % | 2 | 7.2 | 2024-07 → 2026-04 |
+| 6 | CHN | Chalice Mining | 16 | +3.25 % | +13.1 % | +52.9 % | 69 % | 4 | 5.8 | 2023-06 → 2025-06 |
+| 7 | LKE | Lake Resources | 24 | +3.18 % | +8.7 % | +40.0 % | 67 % | 5 | 2.4 | 2023-06 → 2025-12 |
+| 8 | BRN | BrainChip Holdings | 31 | +3.00 % | +6.6 % | +41.5 % | 65 % | 6 | 4.1 | 2023-06 → 2025-12 |
+| 9 | SYR | Syrah Resources | 28 | +2.94 % | +7.0 % | +38.8 % | 64 % | 5 | 10.5 | 2023-06 → 2025-12 |
+| 10 | SGR | Star Entertainment | 21 | +2.93 % | +9.0 % | +41.1 % | 71 % | 1 | 4.4 | 2023-06 → 2026-03 |
 
-The pattern is recognisable: **failing biotech (IMU, IPD, BOT), cleantech /
-battery losers (CXL, LKE, NMT), uranium dud (ERA — wound up), and
-meme-stock pop deflation (BRN, APX)**. IMU and CXL were shorted continuously
-in 32 of 36 OOS months — basically a permanent short for the period.
+The pattern is recognisable: **cleantech / carbon losers (CXL, CHN), broken
+retail (CCX), wound-up uranium (ERA), lithium / battery deflation (LKE, NMT,
+LOT, SYR), meme deflation (BRN), and the Star Entertainment casino-licence
+collapse (SGR)**. CXL and BRN were each shorted in 30 / 31 of the 36 OOS
+months — basically a permanent short for the period.
 
 ### Top 10 losing shorts
 
-`worst month` shows the −16 % stop is doing the heavy lifting — without it
-PLS would have shown ~−21 % in its worst month and PDN ~−26 %.
+`worst month` is capped at −16 % by the stop — without the stop these would
+have been −20 % to −60 %.
 
 | # | Ticker | Company | n months shorted | total P&L (% book) | avg trade | best month | worst month | hit-rate | n stops | avg SI % | first → last |
 |---:|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---|
-| 1 | PLS | Pilbara Minerals | 23 | **−1.63 %** | −3.2 % | +21.0 % | −16.0 % | 44 % | 7 | 15.8 | 2024-01 → 2026-04 |
-| 2 | PDN | Paladin Energy | 21 | −1.35 % | −3.0 % | +26.1 % | −16.0 % | 38 % | 7 | 10.2 | 2023-06 → 2026-01 |
-| 3 | CAT | Catapult Sports | 23 | −1.17 % | −2.4 % | +29.5 % | −16.0 % | 43 % | 5 | 2.0 | 2023-07 → 2026-04 |
-| 4 | FML | Focus Minerals | 9 | −1.09 % | −6.2 % | +15.4 % | −16.0 % | 33 % | 4 | 0.0 | 2024-07 → 2025-12 |
-| 5 | ADH | Adairs | 10 | −1.01 % | −5.1 % | +16.5 % | −16.0 % | 30 % | 5 | 2.4 | 2023-06 → 2024-10 |
-| 6 | DYL | Deep Yellow | 13 | −0.94 % | −3.5 % | +26.1 % | −16.0 % | 39 % | 6 | 7.2 | 2023-06 → 2025-05 |
-| 7 | KGN | Kogan.com | 28 | −0.88 % | −1.2 % | +25.0 % | −16.0 % | 39 % | 5 | 1.5 | 2023-06 → 2025-12 |
-| 8 | BET | BetMakers Technology | 11 | −0.85 % | −3.6 % | +18.3 % | −16.0 % | 36 % | 5 | 1.7 | 2023-06 → 2025-12 |
-| 9 | NXT | NextDC | 4 | −0.83 % | −11.4 % | +0.0 % | −16.0 % | 0 % | 1 | 7.6 | 2025-04 → 2026-04 |
-| 10 | ANG | Austin Engineering | 7 | −0.81 % | −6.1 % | +5.7 % | −16.0 % | 43 % | 3 | 0.1 | 2023-06 → 2023-12 |
+| 1 | CAT | Catapult Sports | 13 | **−1.48 %** | −6.1 % | +10.9 % | −16.0 % | 39 % | 2 | 0.8 | 2023-06 → 2025-09 |
+| 2 | TTT | Titomic | 21 | −1.24 % | −2.6 % | +39.5 % | −16.0 % | 43 % | 10 | 0.1 | 2024-01 → 2026-03 |
+| 3 | EVN | Evolution Mining | 15 | −1.15 % | −4.0 % | +18.2 % | −16.0 % | 40 % | 1 | 1.1 | 2023-06 → 2025-11 |
+| 4 | MYS | MyState | 22 | −1.13 % | −2.4 % | +5.5 % | −12.6 % | 27 % | 0 | 0.3 | 2023-06 → 2026-04 |
+| 5 | PDN | Paladin Energy | 19 | −1.12 % | −2.8 % | +37.9 % | −16.0 % | 32 % | 6 | 7.3 | 2023-06 → 2025-09 |
+| 6 | LTR | Liontown Resources | 19 | −1.10 % | −2.5 % | +29.6 % | −16.0 % | 32 % | 5 | 7.4 | 2024-02 → 2026-04 |
+| 7 | EMR | Emerald Resources | 6 | −1.09 % | −9.8 % | +1.0 % | −16.0 % | 17 % | 3 | 2.0 | 2025-07 → 2025-12 |
+| 8 | AEF | Australian Ethical | 8 | −1.01 % | −6.8 % | +6.5 % | −16.0 % | 38 % | 3 | 0.4 | 2023-06 → 2024-04 |
+| 9 | RSG | Resolute Mining | 5 | −0.99 % | −10.8 % | 0.0 % | −16.0 % | 0 % | 2 | 0.4 | 2025-08 → 2025-12 |
+| 10 | WAF | West African Resources | 9 | −0.95 % | −5.5 % | +17.7 % | −16.0 % | 11 % | 3 | 1.1 | 2023-10 → 2025-11 |
 
-These are mostly **cyclical commodity rallies the model bet against**:
-PLS, PDN, DYL on the lithium / uranium boom of 2024-25; NXT on the
-AI-driven data-centre rally; CAT, KGN, BET on consumer-tech bounce-backs.
-Even the worst loser (PLS) cost the book only −1.6 % of NAV cumulatively
-— the stop loss capped every bad month at −16 % per position. **No
-single name blew up the strategy.**
+The losers cluster on **gold + uranium + lithium re-rates** the model bet
+against: PDN, LTR, EVN, EMR, RSG, WAF, MIN are all commodity names that
+rallied. CAT (sports tech) and AEF (ethical fund manager) were broken
+narratives that snapped back. **No single name cost the book more than
+−1.5 % of NAV cumulatively** — the −16 % per-position stop kept even
+multi-month conviction-shorts under control.
 
 ### What this looks like as a research result
 
@@ -248,29 +275,31 @@ all-3-models-scored. Full top-30 in
 [`reports/current_positions_monthly.csv`](reports/current_positions_monthly.csv);
 regenerate with `scripts/_current_positions.py --monthly`.
 
+Top 15 as of the most recent Friday rebalance (2026-05-29):
+
 | # | Ticker | Company | Mkt Cap (A$m) | Short % | logit | gbm_cls | gbm_rank | Consensus |
 |---:|---|---|---:|---:|---:|---:|---:|---:|
-| 1 | TLX | Telix Pharmaceuticals | 3,794 | **15.15** | 0.652 | 0.570 | −0.141 | 0.957 |
-| 2 | LTR | Liontown Resources | 4,404 | 1.75 | 0.619 | 0.565 | −0.199 | 0.932 |
-| 3 | ILU | Iluka Resources | 2,488 | 7.53 | 0.624 | 0.554 | −0.405 | 0.930 |
-| 4 | WBT | Weebit Nano | 1,065 | 0.32 | 0.573 | 0.614 | 0.258 | 0.928 |
-| 5 | AGI | Ainsworth Game Tech. | 340 | 0.00 | 0.608 | 0.531 | −0.383 | 0.902 |
-| 6 | CAT | Catapult Sports | 983 | 5.15 | 0.652 | 0.477 | −0.414 | 0.894 |
-| 7 | NVX | Novonix | 293 | 2.80 | 0.557 | 0.543 | 0.071 | 0.875 |
-| 8 | NEC | Nine Entertainment | 1,758 | 4.12 | 0.687 | 0.498 | −1.030 | 0.868 |
-| 9 | MVF | Monash IVF | 286 | 1.87 | 0.632 | 0.569 | −1.481 | 0.867 |
-| 10 | MSB | Mesoblast | 1,898 | **8.66** | 0.694 | 0.424 | 0.693 | 0.863 |
-| 11 | AD8 | Audinate | 339 | 1.86 | 0.623 | 0.515 | −0.947 | 0.857 |
-| 12 | EOS | Electro Optic Systems | 1,821 | 3.59 | 0.598 | 0.456 | 0.182 | 0.855 |
-| 13 | CXL | Calix | 211 | 0.36 | 0.615 | 0.456 | −0.362 | 0.853 |
-| 14 | PLS | Pilbara Minerals | 13,590 | **11.53** | 0.574 | 0.528 | −0.627 | 0.848 |
-| 15 | OML | oOh!media | 700 | 0.72 | 0.577 | 0.586 | −1.238 | 0.846 |
+| 1 | BBN | Baby Bunting | 347 | 0.32 | 0.643 | 0.630 | 0.129 | 0.982 |
+| 2 | LTR | Liontown Resources | 4,404 | 1.75 | 0.609 | 0.581 | 0.092 | 0.954 |
+| 3 | EOS | Electro Optic Systems | 1,821 | 3.59 | 0.604 | 0.562 | −0.423 | 0.922 |
+| 4 | AGI | Ainsworth Game Tech. | 340 | 0.00 | 0.619 | 0.654 | −1.121 | 0.909 |
+| 5 | CAT | Catapult Sports | 983 | 5.15 | 0.561 | 0.567 | −0.110 | 0.898 |
+| 6 | TTT | Titomic | 361 | 0.35 | 0.556 | 0.541 | 0.098 | 0.883 |
+| 7 | 4DX | 4D Medical | 1,948 | **10.06** | 0.549 | 0.557 | 0.285 | 0.878 |
+| 8 | MSB | Mesoblast | 1,898 | **8.66** | 0.676 | 0.435 | −0.375 | 0.876 |
+| 9 | TLX | Telix Pharmaceuticals | 3,794 | **15.15** | 0.584 | 0.533 | −0.841 | 0.871 |
+| 10 | ILU | Iluka Resources | 2,488 | 7.53 | 0.619 | 0.557 | −1.310 | 0.871 |
+| 11 | SBM | St Barbara | 702 | 3.57 | 0.584 | 0.465 | −0.548 | 0.857 |
+| 12 | SHV | Select Harvests | 550 | 2.04 | 0.608 | 0.597 | −1.496 | 0.855 |
+| 13 | MYX | Mayne Pharma | 253 | 2.97 | 0.572 | 0.537 | −1.267 | 0.838 |
+| 14 | NVX | Novonix | 293 | 2.80 | 0.519 | 0.595 | −0.085 | 0.829 |
+| 15 | MVF | Monash IVF | 286 | 1.87 | 0.639 | 0.565 | −1.729 | 0.829 |
 
-The list reads like a real ASX short book: TLX, MSB, and PLS at 8–15 %
-short interest are well-known shorts; LTR, ILU, NVX are lithium /
-mining names trading well off prior highs; NEC, MVF, AD8 are
-mid-cap operators where the model is picking up valuation /
-revisions even when SI itself is modest.
+The list reads like a real ASX short book: **TLX, MSB, 4DX at 8-15 %
+short interest** are well-known shorts; LTR is lithium overhang; NVX,
+MVF, SHV, ILU are mid-cap operators where the model picks up valuation
+/ leverage signals even when SI is moderate; BBN, CAT, TTT, AGI, EOS are
+broken-narrative names the model continues to flag.
 
 ---
 
@@ -316,14 +345,27 @@ Paladin Energy (PDN) had a 1:100 reverse share consolidation in early
 2024. FMP's balance-sheet `commonStockSharesOutstanding` reports the
 **latest** share count (~352 m) without back-adjusting history, so
 multiplying by the historical `adjClose` (which IS split-adjusted)
-inflates pre-consolidation mktCap by ~600×. Previous run showed PDN
+inflated pre-consolidation mktCap by ~600×. Previous run showed PDN
 at **A$3.18 trillion** in Aug-Dec 2023.
 
 The fix doesn't hardcode anything. The assemble step now reads
 `enterprise_values.marketCapitalization` (FMP's own quarterly mktCap
 snapshots, which ARE split-aware) and asof-joins them onto the panel.
 Coverage 85.9 % across 262 k rows. PDN now reports **~A$1.4 B in Aug
-2023** — matches FMP's own EV records, no caps, no manual overrides.
+2023** — matches FMP's own EV records.
+
+### Bad-data sanity threshold
+
+For the remaining tickers where FMP's own data is wrong (Village Roadshow
+2011 at A$931 B from `enterprise_values`, CBA in certain quarters >
+A$300 B, etc.), the assemble step now nulls any row above an objective
+physical-impossibility threshold: **A$300 B** — larger than peak BHP
+(~A$250 B mid-2022), the biggest the ASX has ever produced. This is
+not ticker-specific and not a soft cap; it's "if FMP says this is
+bigger than anything that has ever existed on the ASX, drop the row".
+**109 rows nulled** out of 262 k (0.04 %) — top affected tickers:
+VRL (75 rows), CBA (26 rows), INR (8 rows). NaN'd rows fail the
+investable filter (≥ A$200 m) naturally.
 
 ### Fundamental coverage
 
@@ -390,13 +432,6 @@ Java-free fallback.
 
 ## Limitations
 
-* **As-of date is Monday but execution would be Friday.** ASIC's
-  4-business-day lag means each Friday release reports positions
-  as-of the prior Monday. The backtest uses the Monday's adjClose
-  as the entry price, which assumes immediate knowledge of the
-  Monday position; in live trading you'd actually fill on Friday.
-  Drift over 4 business days is small but non-zero. Follow-up:
-  swap the price-join key to `ReleaseDate`.
 * **Stop-loss execution slippage = 100 bps central / 200 bps
   conservative** (`CostConfig.stop_slippage_pct`). Realistic for
   this universe: 30 bps ASX 50, ~100 bps mid-cap, 100–500 bps
