@@ -237,13 +237,61 @@ def _flag(stats: dict) -> str:
     return "mismatch"
 
 
+def _fetch_yahoo_prices_with_volume(
+    symbol_yh: str,
+    *,
+    start: str | None = None,
+    end: str | None = None,
+) -> pd.DataFrame:
+    """Daily Adj Close + Volume from Yahoo for one symbol -> [date, adjClose, volume]."""
+    cols = ["date", "adjClose", "volume"]
+    try:
+        raw = yf.download(
+            symbol_yh, start=start, end=end,
+            auto_adjust=False, progress=False, threads=False, actions=False,
+        )
+    except Exception as exc:
+        logger.warning(f"yfinance download failed for {symbol_yh}: {exc!r}")
+        return pd.DataFrame(columns=cols)
+    if raw is None or raw.empty:
+        return pd.DataFrame(columns=cols)
+
+    adj = _extract_adj_close(raw, symbol_yh)
+    if adj is None or adj.empty:
+        return pd.DataFrame(columns=cols)
+
+    # Extract volume via the same MultiIndex tolerance shim as Adj Close.
+    if isinstance(raw.columns, pd.MultiIndex):
+        try:
+            vol = raw.xs("Volume", axis=1, level=0, drop_level=True)
+        except KeyError:
+            try:
+                vol = raw.xs("Volume", axis=1, level=1, drop_level=True)
+            except KeyError:
+                vol = None
+        if vol is not None and isinstance(vol, pd.DataFrame):
+            vol = vol.squeeze("columns") if vol.shape[1] == 1 else vol.iloc[:, 0]
+    else:
+        vol = raw["Volume"] if "Volume" in raw.columns else None
+
+    out = pd.DataFrame({"adjClose": adj})
+    if vol is not None:
+        out["volume"] = vol
+    else:
+        out["volume"] = pd.NA
+    out = out.reset_index().rename(columns={"Date": "date", "index": "date"})
+    out["date"] = pd.to_datetime(out["date"]).dt.tz_localize(None).dt.normalize()
+    out = out.dropna(subset=["adjClose"]).sort_values("date").reset_index(drop=True)
+    return out[cols]
+
+
 def fetch_many_yahoo_adjusted(
     symbols: list[str],
     *,
     start: str | None = None,
     end: str | None = None,
 ) -> pd.DataFrame:
-    """Bulk Yahoo Finance dividend-adjusted price fetch, stacked long.
+    """Bulk Yahoo Finance dividend-adjusted price + volume fetch, stacked long.
 
     Returns ``[symbol, date, adjClose, volume]`` keyed identically to the
     long FMP price panel so the assemble step can swap sources transparently.
@@ -254,14 +302,13 @@ def fetch_many_yahoo_adjusted(
     n = len(symbols)
     for i, sym in enumerate(symbols, 1):
         try:
-            yh = fetch_yahoo_prices(sym, start=start, end=end)
+            yh = _fetch_yahoo_prices_with_volume(sym, start=start, end=end)
         except Exception as e:  # noqa: BLE001
             logger.warning(f"yh {sym}: {e}")
-            yh = pd.DataFrame(columns=["date", "close"])
+            yh = pd.DataFrame(columns=["date", "adjClose", "volume"])
         if not yh.empty:
-            yh = yh.rename(columns={"close": "adjClose"})
+            yh = yh.copy()
             yh["symbol"] = sym
-            yh["volume"] = pd.NA  # yfinance volume isn't preserved through Adj Close path
             frames.append(yh[["symbol", "date", "adjClose", "volume"]])
         if i % 50 == 0:
             logger.info(f"yh prices: {i}/{n} symbols")
