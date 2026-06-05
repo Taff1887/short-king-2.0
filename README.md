@@ -134,7 +134,97 @@ Full data:
 
 ---
 
-## Results — every model × every bucket, OOS (n = 35 months)
+## Why so many tables? A note on time windows
+
+The most useful number on this page is **"how often does the model pick a
+stock that falls, across as much history as possible?"**. But "as much
+history as possible" means different things for different models:
+
+* **`naive` and `ew` have zero learned parameters.** No training step,
+  nothing to overfit. They can score every month from **2010-06 onwards
+  — 16 years, ~191 monthly rebalances**. Every month is effectively
+  out-of-sample.
+* **`logit` / `gbm_cls` / `gbm_rank` need a walk-forward training
+  window.** The earliest OOF prediction is mid-2013 (after the ~3-year
+  warm-up that walk-forward CV requires). They have **12.8 years of
+  evaluation data — ~154 monthly rebalances**.
+* **The 35-month "pure final-holdout" OOS window** (2023-06 → 2026-05)
+  is the only span where all 5 models get exactly the same data — the
+  trained models' final fit was never exposed to these rows during
+  development. It's the cleanest apples-to-apples comparison but
+  it's a single regime and a small sample (35 monthly rebalances).
+
+So the rest of this page shows **three views** — full record (most
+power), IS_matched (apples-to-apples across the 154-month overlap),
+and 35-month pure OOS (cleanest comparison on the same data). They
+all agree on the headline ranking; they differ on the precision of
+the win-rate estimates.
+
+---
+
+## Results — FULL track record (every model on every month it has predictions for)
+
+This is the headline view — the biggest sample for every model.
+
+### Top-5 picks per month — full record
+
+| Model | Window | n positions | Win rate | Median trade | Mean trade | Worst |
+|---|---|---:|---:|---:|---:|---:|
+| **gbm_rank** | 12.8 yrs (2013-2026) | 770 | **+58.0 %** | +3.77 % | +0.62 % | −217.5 % |
+| **ew** (5-factor) | **15.9 yrs (2010-2026)** | **955** | **+56.7 %** | +3.57 % | +0.68 % | −200.0 % |
+| logit | 12.8 yrs | 770 | +54.0 % | +2.04 % | −0.19 % | −191.4 % |
+| naive | 15.9 yrs | 955 | +50.0 % | +0.00 % | −0.28 % | **−63.0 %** |
+| gbm_cls | 12.8 yrs | 770 | +49.5 % | +0.00 % | −1.28 % | −173.9 % |
+
+### Top-10 picks per month — full record
+
+| Model | Window | n positions | Win rate | Median trade | Mean trade | Worst |
+|---|---|---:|---:|---:|---:|---:|
+| **gbm_rank** | 12.8 yrs | 1,540 | **+56.3 %** | +3.37 % | +0.19 % | −217.5 % |
+| **ew** (5-factor) | 15.9 yrs | 1,910 | +54.3 % | +2.67 % | +0.15 % | −200.0 % |
+| logit | 12.8 yrs | 1,540 | +53.8 % | +1.65 % | −0.71 % | −221.4 % |
+| gbm_cls | 12.8 yrs | 1,540 | +51.5 % | +0.70 % | −0.84 % | −173.9 % |
+| naive | 15.9 yrs | 1,910 | +50.2 % | +0.10 % | +0.11 % | −81.0 % |
+
+### Top-decile picks per month — full record
+
+| Model | Window | n positions | Win rate | Median trade | Mean trade | Worst |
+|---|---|---:|---:|---:|---:|---:|
+| **gbm_rank** | 10.7 yrs | 3,844 | **+54.1 %** | +2.28 % | −0.69 % | −221.4 % |
+| ew (5-factor) | 12.2 yrs | 4,395 | +53.1 % | +1.89 % | −0.32 % | −200.0 % |
+| logit | 10.7 yrs | 3,844 | +52.2 % | +1.04 % | −0.50 % | −221.4 % |
+| gbm_cls | 10.7 yrs | 3,844 | +50.3 % | +0.28 % | −1.18 % | −173.9 % |
+| naive | 12.2 yrs | 4,395 | +49.3 % | +0.00 % | −0.32 % | −134.1 % |
+
+> The "years" column for the decile bucket is shorter (10.7 / 12.2 vs
+> 12.8 / 15.9) because at some early rebalances the universe was
+> small enough that the top-decile basket couldn't cleanly form for
+> every month.
+
+**What the long history confirms:**
+
+* **`gbm_rank`** is the highest-win-rate model at every bucket across
+  10+ years. Not a 35-month fluke — over 770 top-5 picks across
+  12.8 years, it picked a falling stock 58 % of the time.
+* **`ew` (5-factor)** is essentially tied with gbm_rank at top-5 (56.7 %
+  vs 58.0 %) and beats it on sample size (955 vs 770 positions, 15.9
+  vs 12.8 years). For a *no-training* composite to keep pace with the
+  best trained model over 16 years is the strongest possible case for
+  the hand-built short signal.
+* **`naive`** sits around 50 % across the full history. Short-interest
+  alone is barely a signal; it needs the rest of the EW factor stack
+  to work.
+* **`gbm_cls`** is essentially noise (49.5 % at top-5 — below random!).
+  The binary-classification objective on this universe doesn't help
+  beyond what logit already extracts.
+
+---
+
+## Results — pure final-holdout OOS (n=35, apples-to-apples comparison)
+
+The 35-month window where every model is evaluated on exactly the same
+data the trained models' final fits had never seen. Smaller sample but
+the only place where the comparison is perfectly fair.
 
 ### Top-5 picks per month — OOS (175 positions over 35 months)
 
