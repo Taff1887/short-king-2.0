@@ -29,26 +29,36 @@ Net of 25 bps round-trip commission per side + 1.5 % p.a. borrow + 5 bps
 slippage. **No stop loss** — every position realises its full uncapped
 monthly forward return. Annualisation factor = 12 (monthly).
 
-**Sample sizes:** IS = 156 monthly rebalances for `naive` / `ew` (no
-training needed, so they use the full pre-2023-06 panel) and 119 OOF
-monthly observations for the trained models (`logit`, `gbm_cls`,
-`gbm_rank`). OOS = **35 monthly rebalances** for *every* model
-(2023-06 → 2026-05; the 36th month has no forward window). Read
-Sharpes accordingly — 35 monthly returns is a meaningful sample but
-nowhere near "definitive". A Sharpe of 0.9 on n=35 is not the same
-beast as Sharpe 0.9 on n=600.
+**About sample sizes.** `naive` and `ew` have **zero learned
+parameters** — the algorithm is fully specified up front, so for
+them there is no IS/OOS distinction at the model level. They can be
+(and below, are) evaluated over the **entire 191-month panel**
+(2010-06 → 2026-05). For the trained models (`logit`, `gbm_cls`,
+`gbm_rank`) the OOS holdout matters: the model never saw those rows
+during development, so OOS performance is the only honest estimate
+of future performance. We therefore report **two tables** below:
 
-### Dollar-neutral long-short quintile (long bottom 20 %, short top 20 % by score)
+1. **Apples-to-apples OOS** (n=35 monthly rebalances) so every
+   model is compared on the same window.
+2. **Full-period stats** for the parameter-free models (n=191)
+   — the statistically richer estimate when no training was done.
 
-| Model | n_IS | IS Sharpe | n_OOS | **OOS Sharpe** | OOS CAGR | OOS MaxDD | OOS Hit-rate |
-|---|---:|---:|---:|---:|---:|---:|---:|
-| **naive** (rank ShortPct) | 156 | 0.57 | 35 | **0.92** | +11.2 % | **−10.8 %** | **68.6 %** |
-| **ew** (polarity-aware composite) | 156 | 0.51 | 35 | **0.91** | **+17.2 %** | −16.5 % | 48.6 % |
-| logit (rebuilt v1) | 119 | 0.24 | 35 | 0.24 | +2.9 % | −37.1 % | 48.6 % |
-| gbm_rank (LightGBM LambdaRank) | 119 | −0.06 | 35 | −0.21 | −8.2 % | −51.6 % | 37.1 % |
-| gbm_cls (LightGBM binary) | 119 | −0.10 | 35 | −1.11 | −16.3 % | −44.4 % | 45.7 % |
+### Table 1 — Dollar-neutral long-short quintile, OOS holdout (n=35, all models)
 
-### Top-quintile short only (no long leg)
+Long bottom 20 % by score, short top 20 %. Same 36-month window,
+same costs, same construction.
+
+| Model | n_OOS | **OOS Sharpe** | OOS CAGR | OOS MaxDD | OOS Hit-rate |
+|---|---:|---:|---:|---:|---:|
+| **naive** (rank ShortPct) | 35 | **0.92** | +11.2 % | **−10.8 %** | **68.6 %** |
+| **ew** (polarity-aware composite) | 35 | **0.91** | **+17.2 %** | −16.5 % | 48.6 % |
+| logit (rebuilt v1) | 35 | 0.24 | +2.9 % | −37.1 % | 48.6 % |
+| gbm_rank (LightGBM LambdaRank) | 35 | −0.21 | −8.2 % | −51.6 % | 37.1 % |
+| gbm_cls (LightGBM binary) | 35 | −1.11 | −16.3 % | −44.4 % | 45.7 % |
+
+### Table 2 — Top-quintile short only, OOS holdout (n=35, all models)
+
+No long leg. Same window/costs.
 
 | Model | n_OOS | OOS Sharpe | OOS CAGR | OOS MaxDD | OOS Hit-rate |
 |---|---:|---:|---:|---:|---:|
@@ -58,28 +68,55 @@ beast as Sharpe 0.9 on n=600.
 | gbm_rank | 35 | −0.50 | −15.2 % | −56.1 % | 40.0 % |
 | gbm_cls | 35 | −1.11 | −18.9 % | −53.4 % | 34.3 % |
 
+### Table 3 — Full-period stats for the parameter-free models (n=191)
+
+`naive` and `ew` have no training step, so we can evaluate them on
+the entire **191-month** panel (16 years, June 2010 → May 2026).
+This is **5× the sample** of the OOS-only tables above, and includes
+the COVID crash, the 2022 bear, and multiple commodity cycles —
+several genuine regime changes the OOS-only window doesn't capture.
+
+| Model | Strategy | n | Sharpe | CAGR | MaxDD | Hit-rate |
+|---|---|---:|---:|---:|---:|---:|
+| naive | L/S quintile | 191 | **0.62** | +8.2 % | −31.0 % | 61.3 % |
+| ew | L/S quintile | 191 | 0.58 | +10.2 % | −57.4 % | 59.7 % |
+| naive | quintile-short | 191 | −0.29 | −8.5 % | −82.7 % | 47.1 % |
+| ew | quintile-short | 191 | −0.20 | −9.5 % | −86.2 % | 46.1 % |
+
+**Full-period Sharpes are weaker than OOS-only Sharpes** (0.62 vs
+0.92 for naive; 0.58 vs 0.91 for ew) — the post-2023 regime has been
+particularly kind to short-interest cross-sectional strategies, and
+that 35-month window flatters the result. The n=191 Sharpes are the
+**more statistically meaningful** estimate for these models. They
+still show real positive long-short alpha (0.5+ Sharpe over 16 years
+with realistic costs), but at a more sober level than the recent OOS
+window alone would suggest.
+
+The short-only books (Table 2 OOS and the last two rows of Table 3)
+are **negative Sharpe at every horizon**. Naked-short alpha is not a
+viable standalone strategy on this universe; the dollar-neutral L/S
+quintile carries on the long leg.
+
 ![Cumulative growth of $1 — solid = quintile-short, dotted = long-short](charts/cumulative_returns_monthly.png)
 
 ### What this honestly shows
 
-**Two models clear positive OOS Sharpe: `naive` (0.92) and `ew` (0.91).**
-Both are *no-training* baselines — `naive` is a single column
-(ShortPct rank), `ew` is a hand-built equal-weight composite of 12
-ranked factors with each factor oriented to the SHORT direction
-(see [§EW model explainer](#2-ew--equal-weight-composite-of-12-ranked-factors)
-for why polarity matters). The three trained models (`logit`,
-`gbm_rank`, `gbm_cls`) all run statistically-significant **negative
-OOS IC** (their score correctly correlates with falling stocks — see
+**Two no-training models clear positive long-short Sharpe at every
+horizon.** `naive` (rank by raw ShortPct) prints 0.62 Sharpe over the
+full 16-year panel and 0.92 over the recent OOS window. `ew` (the
+polarity-aware 12-factor composite) prints 0.58 full-period and 0.91
+OOS. Both rely on simple, hand-specified algorithms with zero learned
+parameters — and both beat all three of the trained models on OOS
+Sharpe.
+
+The three trained models (`logit`, `gbm_rank`, `gbm_cls`) all run
+statistically-significant **negative OOS IC** (their score correctly
+correlates with falling stocks — see
 [IC table below](#information-coefficients--is-and-oos)) — they pick the
 right names — but they concentrate too tightly into the high-conviction
 short tail (Appen, 4D Medical, BrainChip, Sunrise Resources) and get
 mauled when those names squeeze. `naive`'s and `ew`'s broader picks
 ride those tails out.
-
-**The short-only books (no long leg) are all negative Sharpe in OOS.**
-Naked-short alpha is not a viable standalone strategy at this universe
-and rebalance frequency. The dollar-neutral L/S quintile carries
-mostly on the long leg.
 
 ### Per-position win-rate is > 50 % — the issue is magnitude, not direction
 
@@ -106,13 +143,16 @@ concentrating into the same handful of squeeze names. That's exactly
 what you'd hope from a properly-polarised multi-factor short
 composite — it's why polarity matters.
 
-**Both baselines compete with the trained models.** Sorting by raw
-ShortPct (`naive`) gives OOS L/S quintile Sharpe **0.92**; the
-polarity-corrected equal-weight composite (`ew`) gives **0.91** with
-the highest CAGR of any model (+17.2 %). On this universe,
-short-interest dispersion plus a hand-built composite of cheap-and-
-levered-and-shrinking signals beats fancy training. **That is itself
-the headline research finding.**
+**Both no-training baselines beat the trained models.** `naive` and
+`ew` each have zero learned parameters, and over the full 16-year
+panel (n=191) they both deliver positive long-short Sharpe (0.62
+and 0.58) with positive CAGR (+8.2 % and +10.2 %). On the recent
+OOS window they accelerate to 0.92 and 0.91. On this universe,
+**short-interest dispersion plus a hand-built composite of cheap-
+and-levered-and-shrinking signals beats fancy training**. That is
+itself the headline research finding — the data isn't asking for a
+gradient-boosted ranker; it's asking for the right human prior on
+which factors to combine.
 
 ---
 
