@@ -330,28 +330,48 @@ def main() -> int:
     naive_score = naive_si_rank(df).reindex(df.index)
 
     # --- 2. EW composite -----------------------------------------------------
-    # The baselines module's DEFAULT_EW_COLS expects coarse theme ranks
-    # (short_rk/momentum_rk/...) which don't exist in our feature panel - we
-    # rank individual factors, not themes. Hand-pick one representative rank
-    # column per family. Missing columns are tolerated by ew_composite.
-    _EW_COLS = [
-        c for c in (
-            "short_pct_ff_rk",        # short interest as % of free float
-            "ShortPct_rk",            # raw short pct (fallback)
-            "si_z_52w_rk",            # SI z-score
-            "mom_12w_rk",             # 12-week price momentum
-            "vol_4w_rk",              # short-term realised vol
-            "log_mktcap_rk",          # size
-            "pe_rk", "fcf_yield_rk",  # valuation (expensive = positive)
-            "roe_rk", "roic_rk",      # quality
-            "debt_equity_rk",         # leverage
-            "revenue_growth_yoy_rk",  # growth
-        ) if c in df.columns
-    ]
-    logger.info(
-        f"model: ew_composite (no fit; equal-weight blend over {len(_EW_COLS)} *_rk cols)"
+    # Every input rank must be SHORT-aligned (high rank = MORE shortable) for
+    # the equal-weight mean to be a coherent short-attractiveness score.
+    # Cross-sectional rank columns built upstream are oriented to the raw
+    # factor direction, so bullish-quality / bullish-growth factors need to
+    # be FLIPPED before averaging. Polarity table:
+    #
+    #   +1  high rank already means more shortable -> keep
+    #   -1  high rank means a "good" company       -> invert via (1 - rank)
+    #
+    # Earlier versions of this script averaged the raw ranks directly, which
+    # caused EW to score WINNERS (positive IC ~ +5 %) - the bullish-quality
+    # factors dominated. The polarity-aware version below produces a proper
+    # SHORT composite with negative IC.
+    _EW_SPEC: tuple[tuple[str, int], ...] = (
+        ("short_pct_ff_rk",        +1),  # short interest / free float
+        ("ShortPct_rk",            +1),  # raw short pct
+        ("si_z_52w_rk",            +1),  # SI z-score vs 52w history
+        ("mom_12w_rk",             -1),  # high momentum = bullish, invert
+        ("vol_4w_rk",              +1),  # high vol = low-vol anomaly says shortable
+        ("log_mktcap_rk",          -1),  # mega-caps less shortable, invert
+        ("pe_rk",                  +1),  # high P/E = expensive = shortable
+        ("fcf_yield_rk",           -1),  # cash-rich = bullish, invert
+        ("roe_rk",                 -1),  # high ROE = quality = bullish, invert
+        ("roic_rk",                -1),  # high ROIC = quality = bullish, invert
+        ("debt_equity_rk",         +1),  # high leverage = shortable
+        ("revenue_growth_yoy_rk",  -1),  # high growth = bullish, invert
     )
-    ew_score = ew_composite(df, cols=_EW_COLS).reindex(df.index)
+    _EW_COLS = [c for c, _ in _EW_SPEC if c in df.columns]
+    _EW_INVERT = [c for c, sign in _EW_SPEC if sign == -1 and c in df.columns]
+
+    # Build a SHORT-oriented copy of just the EW columns. Bullish factors get
+    # flipped via (1 - rank). The underlying cross-sectional ranks live in
+    # [0, 1] so the flip stays in [0, 1].
+    df_ew = df.copy()
+    for c in _EW_INVERT:
+        df_ew[c] = 1.0 - df_ew[c]
+
+    logger.info(
+        f"model: ew_composite (polarity-aware; {len(_EW_COLS)} cols, "
+        f"{len(_EW_INVERT)} flipped for short-alignment: {_EW_INVERT})"
+    )
+    ew_score = ew_composite(df_ew, cols=_EW_COLS).reindex(df.index)
 
     # --- 3. Logistic regression (walk-forward) -------------------------------
     logger.info("model: logit (walk-forward)")

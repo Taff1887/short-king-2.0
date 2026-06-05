@@ -42,9 +42,9 @@ beast as Sharpe 0.9 on n=600.
 
 | Model | n_IS | IS Sharpe | n_OOS | **OOS Sharpe** | OOS CAGR | OOS MaxDD | OOS Hit-rate |
 |---|---:|---:|---:|---:|---:|---:|---:|
-| **naive** (rank ShortPct) | 156 | 0.57 | 35 | **0.92** | **+11.2 %** | **−10.8 %** | **68.6 %** |
+| **naive** (rank ShortPct) | 156 | 0.57 | 35 | **0.92** | +11.2 % | **−10.8 %** | **68.6 %** |
+| **ew** (polarity-aware composite) | 156 | 0.51 | 35 | **0.91** | **+17.2 %** | −16.5 % | 48.6 % |
 | logit (rebuilt v1) | 119 | 0.24 | 35 | 0.24 | +2.9 % | −37.1 % | 48.6 % |
-| ew (long-bias composite) | 156 | −0.38 | 35 | 0.08 | −0.4 % | −33.1 % | 54.3 % |
 | gbm_rank (LightGBM LambdaRank) | 119 | −0.06 | 35 | −0.21 | −8.2 % | −51.6 % | 37.1 % |
 | gbm_cls (LightGBM binary) | 119 | −0.10 | 35 | −1.11 | −16.3 % | −44.4 % | 45.7 % |
 
@@ -52,24 +52,29 @@ beast as Sharpe 0.9 on n=600.
 
 | Model | n_OOS | OOS Sharpe | OOS CAGR | OOS MaxDD | OOS Hit-rate |
 |---|---:|---:|---:|---:|---:|
+| **ew** | 35 | **−0.08** | −4.1 % | **−36.6 %** | **51.4 %** |
 | logit | 35 | −0.20 | −6.3 % | −40.9 % | 48.6 % |
 | naive | 35 | −0.32 | −7.2 % | −35.7 % | 51.4 % |
 | gbm_rank | 35 | −0.50 | −15.2 % | −56.1 % | 40.0 % |
-| ew | 35 | −1.12 | −14.8 % | −42.5 % | 34.3 % |
 | gbm_cls | 35 | −1.11 | −18.9 % | −53.4 % | 34.3 % |
 
 ![Cumulative growth of $1 — solid = quintile-short, dotted = long-short](charts/cumulative_returns_monthly.png)
 
 ### What this honestly shows
 
-**Only `naive` (rank by raw ShortPct) clears positive Sharpe in OOS.**
-+0.92 Sharpe, +11.2 % CAGR, -10.8 % MaxDD — investable but not heroic.
-All four other models collapse to flat-or-negative Sharpe. The trained
-models aren't *wrong* (their OOS information coefficient is still
-significantly negative — see [§Information coefficients](#information-coefficients--is-and-oos));
-they just **concentrate into specific high-conviction shorts that get
-squeezed** (Appen, 4D Medical, BrainChip, Sunrise Resources). Naive's
-broader picks ride those tails out.
+**Two models clear positive OOS Sharpe: `naive` (0.92) and `ew` (0.91).**
+Both are *no-training* baselines — `naive` is a single column
+(ShortPct rank), `ew` is a hand-built equal-weight composite of 12
+ranked factors with each factor oriented to the SHORT direction
+(see [§EW model explainer](#2-ew--equal-weight-composite-of-12-ranked-factors)
+for why polarity matters). The three trained models (`logit`,
+`gbm_rank`, `gbm_cls`) all run statistically-significant **negative
+OOS IC** (their score correctly correlates with falling stocks — see
+[IC table below](#information-coefficients--is-and-oos)) — they pick the
+right names — but they concentrate too tightly into the high-conviction
+short tail (Appen, 4D Medical, BrainChip, Sunrise Resources) and get
+mauled when those names squeeze. `naive`'s and `ew`'s broader picks
+ride those tails out.
 
 **The short-only books (no long leg) are all negative Sharpe in OOS.**
 Naked-short alpha is not a viable standalone strategy at this universe
@@ -78,34 +83,36 @@ mostly on the long leg.
 
 ### Per-position win-rate is > 50 % — the issue is magnitude, not direction
 
-The trained models pick **the right names**. Per-position win-rate
-(share of monthly shorts that ended profitable, i.e. the stock fell
-during the month) is at or above 50 % for everything except `ew`.
-The `n` column shows the actual number of monthly short positions
-each model placed across the 35-month OOS holdout:
+Every model picks **the right names**. Per-position win-rate (share
+of monthly shorts that ended profitable, i.e. the stock fell during
+the month) is at or above 50 % for all five — even the worst
+overall-Sharpe model (`gbm_cls`) picks shorts that fall ~51 % of the
+time. The `n` column shows the actual number of monthly short
+positions each model placed across the 35-month OOS holdout:
 
 | Model | n positions | Per-position win-rate | Median trade | Mean trade | Worst single position |
 |---|---:|---:|---:|---:|---:|
-| **logit** | 2,089 | **53.4 %** | **+1.71 %** | −0.33 % | −218 % (APX 2024-07) |
-| gbm_rank | 2,089 | 52.5 % | +1.85 % | −0.87 % | −218 % (4DX 2025-08) |
+| **logit** | 2,089 | **53.4 %** | +1.71 % | −0.33 % | −218 % (APX 2024-07) |
+| gbm_rank | 2,089 | 52.5 % | **+1.85 %** | −0.87 % | −218 % (4DX 2025-08) |
+| **ew** | 2,089 | 52.0 % | +1.20 % | **+0.27 %** | −218 % (4DX) |
 | naive | 2,089 | 50.9 % | +0.43 % | 0.00 % | −177 % (BRN 2024-01) |
-| gbm_cls | 2,089 | 50.8 % | +0.38 % | −1.27 % | −217 % (4DX) |
-| ew | 2,089 | 47.4 % | −0.50 % | −0.56 % | −50 % |
+| gbm_cls | 2,089 | 50.8 % | +0.38 % | −1.27 % | −218 % (4DX) |
 
-`logit`'s **median** trade is **+1.71 %** (most months win) but its
-**mean** is **−0.33 %**. The gap is fat-right-tail squeezes — APX
-+218 %, 4DX +217 %, BRN +177 % in a single month. One of those at a
-2.5 % book weight costs ~5 % of NAV in one stroke and erases an entire
-year of median-trade gains. This is **structural to short-selling**:
-a long position can lose at most 100 %; a short can lose 500 % +.
+`logit` has the highest win-rate (53.4 %) but a negative **mean**
+trade (−0.33 %) — the squeeze-loss tail drags it down. `ew` is the
+**only model with a positive mean per-position trade** (+0.27 %)
+because its broader, factor-diversified short list avoids
+concentrating into the same handful of squeeze names. That's exactly
+what you'd hope from a properly-polarised multi-factor short
+composite — it's why polarity matters.
 
-**The naive baseline is competitive.** Sorting by raw ShortPct (no
-training required), long-bottom-20% / short-top-20%, earns OOS Sharpe
-**0.92** with an 68.6 % monthly hit-rate and a **−10.8 % MaxDD**. On this
-universe, short-interest dispersion is the dominant cross-sectional
-signal; the trained models earn back a real but small slice on top
-when their picks don't get squeezed. **That is itself the headline
-research finding.**
+**Both baselines compete with the trained models.** Sorting by raw
+ShortPct (`naive`) gives OOS L/S quintile Sharpe **0.92**; the
+polarity-corrected equal-weight composite (`ew`) gives **0.91** with
+the highest CAGR of any model (+17.2 %). On this universe,
+short-interest dispersion plus a hand-built composite of cheap-and-
+levered-and-shrinking signals beats fancy training. **That is itself
+the headline research finding.**
 
 ---
 
@@ -161,6 +168,33 @@ shortable** (more likely to fall in the next month). Every month we
 sort the ~500 stocks by score, short the top 20 % (worst expected),
 and (for the L/S quintile) buy the bottom 20 % (best expected).
 
+### What "long-short quintile" actually means — and why it's a spread trade
+
+Imagine the model ranks 500 ASX stocks every month from
+**most-shortable** (rank #1, the model's strongest bearish bet) to
+**least-shortable** (rank #500, the model's strongest bullish bet —
+because "least shortable" = "best expected return"). Then:
+
+1. **Short the top 100** (top quintile = top 20 % by score). These are
+   the stocks the model says will *fall the most*.
+2. **Buy the bottom 100** (bottom quintile = bottom 20 % by score).
+   These are *not* "bad companies the model also picked" — they're
+   the **opposite extreme**. The same model says these have the
+   *best* expected forward returns (high quality, low SI, positive
+   momentum, low leverage, etc.).
+3. Equal-weight inside each leg. Net dollar exposure = 0 (long $ =
+   short $) so market-direction risk cancels.
+
+You're not betting that the market goes up or down. You're betting
+that **the spread between the two ends is real** — that the model's
+top-ranked names will under-perform its bottom-ranked names. The middle
+60 % of stocks gets ignored entirely; only the two extremes trade.
+
+This is why a strategy can have *negative* short-only Sharpe but
+*positive* L/S Sharpe: the short leg loses money on a naked basis,
+but the long leg makes enough that the spread is still profitable —
+and the dollar-neutrality means no market-beta exposure either way.
+
 ### 1. `naive` — sort by reported short interest
 
 **What it does:** For each rebalance month, looks up the ASIC-reported
@@ -184,28 +218,54 @@ defence against that — it just rides the broad signal and accepts the
 tail loss. Survives in this dataset because the short basket is
 diversified across ~100 names per month.
 
-### 2. `ew` — equal-weight composite of 12 ranked factors
+### 2. `ew` — equal-weight composite of 12 ranked factors (polarity-aware)
 
-**What it does:** Computes 12 different cross-sectional ranks (short %,
-multi-horizon momentum, volatility, market cap, P/E, ROE, debt/equity,
-FCF yield, revenue growth, etc.) and averages them. Higher composite
-rank = more shortable.
+**What it does:** Computes 12 different cross-sectional rank columns
+(short %, momentum, volatility, market cap, P/E, ROE, ROIC, FCF yield,
+debt/equity, revenue growth, etc.) and averages them — with **every
+factor pre-oriented so that high rank = more shortable** before the
+mean is taken. This polarity step is the difference between a useful
+short composite and a long-biased one.
 
-**The math:** For each month, each factor *f* is ranked 0-1 across all
-stocks. Score = `mean(rank_f1, rank_f2, ..., rank_f12)`. No
-parameters, no training — every factor gets equal weight.
+**The math:** For each month, each factor *f* is ranked 0-1 across
+all stocks. Some factors are SHORT-aligned in their raw form (high
+P/E = expensive = shortable ✓; high SI = crowded short = shortable ✓);
+others are BULLISH-aligned (high ROE = quality, high momentum = up-trending,
+high FCF yield = cash-rich) and get **flipped via `1 − rank`** before
+averaging. Final score = mean of the 12 polarised ranks, re-ranked
+cross-sectionally. No parameters, no training — every factor gets
+equal weight.
+
+The flipped factors are: `mom_12w_rk`, `log_mktcap_rk`,
+`fcf_yield_rk`, `roe_rk`, `roic_rk`, `revenue_growth_yoy_rk`.
+
+**Why it works:** Beats every trained model on OOS IC (`-8.9 %` with
+t-stat `-3.83`) and matches `naive` on OOS L/S quintile Sharpe (0.91
+vs 0.92). On a small-mid-cap ASX universe, **a hand-built
+short-composite of cheap + levered + shrinking signals is the cleanest
+single-pass alpha** — fancier models add noise.
 
 **Why it included:** Industry-standard "smart-beta" composite — what
 you'd build before you had any historical data to train on. A useful
-sanity check: if a trained model can't beat equal weight, the
-"training" wasn't adding signal.
+sanity check: if a trained model can't beat a polarity-aware equal-
+weight composite, the training isn't adding signal.
 
-**Limitation:** Many of the input factors (high ROE, low debt,
-positive momentum) are **bullish** signals on their own — averaging
-them in a *short* score is conceptually backwards. That's why `ew`
-shows up with a **positive** IC (+4.8 %): its score correlates with
-*winners*, not losers. It's effectively a long-bias model dropped
-into a short-bias frame.
+**Limitation:** Equal weight is arbitrary. A real-money build would
+optimise factor weights (e.g. via IC-weighted blending) or at least
+group-equal-weight by theme (short × valuation × quality × growth).
+Also: choosing which 12 factors to include and their polarity is
+itself a research decision — the model isn't "data-driven" in the
+ML sense, it's a thoughtful human prior.
+
+> **Why this matters.** A previous version of this composite
+> averaged the raw ranks *without flipping the bullish factors*. The
+> result was an EW score that correlated *positively* with forward
+> returns (+4.8 % IC) — it was a long-bias model wearing a short
+> mask. Fixing the polarity (one ~20-line edit in
+> `scripts/05_train_and_validate.py`) flipped IC to **−8.9 %** and
+> OOS L/S Sharpe from **0.08 → 0.91**. Boring but instructive: when
+> you blend factors, the sign of each input has to match the sign of
+> the score you're building.
 
 ### 3. `logit` — logistic regression on all the ranked features
 
@@ -402,19 +462,22 @@ cross-sectionally each month then summarised:
 
 | Model | IS IC | IS t-stat | n_IS | OOS IC | OOS t-stat | n_OOS |
 |---|---:|---:|---:|---:|---:|---:|
-| logit | **−4.7 %** | **−4.53** | 119 | **−8.5 %** | **−3.88** | 35 |
-| gbm_rank | **−7.0 %** | **−5.00** | 119 | **−7.3 %** | **−2.45** | 35 |
-| gbm_cls | −3.3 % | −3.37 | 119 | −2.6 % | −1.36 | 35 |
-| naive | −1.7 % | −1.86 | 119 | −2.7 % | −1.79 | 35 |
-| ew | +4.0 % | +4.26 | 119 | +4.8 % | +2.52 | 35 |
+| **ew** | **−8.3 %** | **−6.73** | 156 | **−8.9 %** | **−3.83** | 35 |
+| gbm_rank | **−7.6 %** | **−5.61** | 119 | **−6.9 %** | **−2.16** | 35 |
+| logit | **−5.3 %** | **−5.28** | 119 | **−5.5 %** | **−2.48** | 35 |
+| gbm_cls | −3.6 % | −3.77 | 119 | −2.3 % | −1.33 | 35 |
+| naive | −1.6 % | −1.70 | 156 | −2.1 % | −1.38 | 35 |
 
 **Sign reading.** Negative IC = the "shortable" score correlates with
-*lower* forward returns — the model correctly identifies underperformers.
-All three trained models hit statistically-significant negative IC in
-both IS and OOS. `ew` is a long-bias composite (most of its inputs flag
-*quality* names, not bad ones) and reliably picks WINNERS — that's why
-its Sharpe is lower in the short book and the long-short construction
-benefits from the long leg.
+*lower* forward returns — the model correctly identifies under-
+performers. **All five models now have negative IC in both IS and
+OOS**, and four of them are statistically significant (|t| > 2).
+The polarity-aware `ew` composite has the strongest OOS IC of any
+model (`−8.9 %`, t = `−3.83`), edging out the gradient-boosted
+ranker. `naive` is the weakest IC (its `t` doesn't clear ±2) because
+ShortPct alone is a high-variance signal — but the L/S quintile
+construction smooths that out enough to deliver the headline 0.92
+Sharpe.
 
 ---
 
@@ -746,8 +809,16 @@ Java-free fallback.
   sector-neutral construction — flagged as a deliberate research
   decision, not an oversight.
 * **Sector dummies skipped** — FMP `profile` not yet pulled. Easy follow-up.
-* **Borrow cost flat 150 bps p.a.** Real ASX borrow varies by name and
-  date; the `CostConfig` is fully parameterised.
+* **Borrow cost flat 150 bps p.a.** — significantly underestimates the
+  small-cap squeeze tail. Real ASX borrow rates run roughly:
+  ~25–50 bps/yr for ASX 50 large-caps with deep stock-lending
+  markets, ~100–200 bps for mid-caps, **500–1,500 bps for crowded
+  small-cap shorts**, and 5,000+ bps (or outright recall) for active
+  squeeze names. The 1.5 % p.a. in `CostConfig` is conservative on an
+  ASX 100 book and materially **understates costs in the names where
+  the alpha appears to live**. The `CostConfig` is fully parameterised
+  — wiring in a per-ticker borrow term structure is on the follow-up
+  list.
 * **Capital-raise / squeeze dynamics absent.** The engine is pure
   adjusted-close, no halt / takeover / index-event modelling.
 * **Sample limitations.** OOS = 36 months (3 years). That's a strong
