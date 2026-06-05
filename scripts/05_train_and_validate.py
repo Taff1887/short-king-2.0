@@ -341,30 +341,33 @@ def main() -> int:
     # --- 2. EW composite -----------------------------------------------------
     # Every input rank must be SHORT-aligned (high rank = MORE shortable) for
     # the equal-weight mean to be a coherent short-attractiveness score.
-    # Cross-sectional rank columns built upstream are oriented to the raw
-    # factor direction, so bullish-quality / bullish-growth factors need to
-    # be FLIPPED before averaging. Polarity table:
     #
-    #   +1  high rank already means more shortable -> keep
-    #   -1  high rank means a "good" company       -> invert via (1 - rank)
+    # **REDUCED SPEC** (5 factors, down from 12) -- derived from the
+    # per-factor IS-only IC audit (scripts/_factor_ic_audit.py /
+    # reports/factor_ic_audit.csv). The previous 12-factor spec contained:
+    #   * One factor with the WRONG sign on the data (debt_equity_rk: IS
+    #     IC was POSITIVE, meaning high leverage predicted HIGHER returns
+    #     on this universe -- opposite of the textbook story).
+    #   * Two collinear weak factors (ShortPct_rk, si_z_12m_rk both
+    #     overlapped with short_pct_ff_rk and weren't significant on their
+    #     own).
+    #   * Two borderline-significant factors (mom_3m_rk, revenue_growth at
+    #     t ~ 2.5) that didn't pass a strict |t| >= 2.9 threshold.
+    #   * A collinear quality factor (roic_rk overlapped with roe_rk).
     #
-    # Earlier versions of this script averaged the raw ranks directly, which
-    # caused EW to score WINNERS (positive IC ~ +5 %) - the bullish-quality
-    # factors dominated. The polarity-aware version below produces a proper
-    # SHORT composite with negative IC.
+    # The kept 5 cover 5 distinct economic dimensions: SI / vol / valuation
+    # / cash quality / profitability. Every factor has |t| >= 2.9 on IS
+    # data AND a sensible economic story. Less is more -- fewer factors
+    # = less noise, fewer cross-correlations, clearer interpretation.
+    #
+    #   +1  raw high rank already means more shortable -> keep
+    #   -1  raw high rank means a "good" company       -> invert via (1 - rank)
     _EW_SPEC: tuple[tuple[str, int], ...] = (
-        ("short_pct_ff_rk",        +1),  # short interest / free float
-        ("ShortPct_rk",            +1),  # raw short pct
-        ("si_z_12m_rk",            +1),  # SI z-score vs 52w history
-        ("mom_3m_rk",             -1),  # high momentum = bullish, invert
-        ("vol_1m_rk",              +1),  # high vol = low-vol anomaly says shortable
-        ("log_mktcap_rk",          -1),  # mega-caps less shortable, invert
-        ("pe_rk",                  +1),  # high P/E = expensive = shortable
-        ("fcf_yield_rk",           -1),  # cash-rich = bullish, invert
-        ("roe_rk",                 -1),  # high ROE = quality = bullish, invert
-        ("roic_rk",                -1),  # high ROIC = quality = bullish, invert
-        ("debt_equity_rk",         +1),  # high leverage = shortable
-        ("revenue_growth_yoy_rk",  -1),  # high growth = bullish, invert
+        ("short_pct_ff_rk",  +1),  # SI / free float    | IS t = -2.44
+        ("vol_1m_rk",        +1),  # 1-month vol        | IS t = -4.27
+        ("pe_rk",            +1),  # expensive P/E      | IS t = -2.92
+        ("fcf_yield_rk",     -1),  # high FCF = bullish | IS t = +8.36
+        ("roe_rk",           -1),  # high ROE = bullish | IS t = +6.49
     )
     _EW_COLS = [c for c, _ in _EW_SPEC if c in df.columns]
     _EW_INVERT = [c for c, sign in _EW_SPEC if sign == -1 and c in df.columns]

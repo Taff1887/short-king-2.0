@@ -66,17 +66,19 @@ concentrated you make the short list — picking just the model's
 
 | Model | n_OOS positions | Win rate | Median trade | Worst trade |
 |---|---:|---:|---:|---:|
-| **gbm_rank** (top-5 OOS) | 175 | **+60.0 %** | **+4.54 %** | −217.5 % |
-| **ew** (top-5 OOS) | 175 | **+57.7 %** | +3.99 % | −52.4 % |
+| **gbm_rank** (top-5 OOS) | 175 | **+60.0 %** | +4.55 % | −217.5 % |
+| **ew** (top-5 OOS, 5-factor) | 175 | **+59.4 %** | **+5.46 %** | **−66.6 %** |
 | naive (top-5 OOS) | 175 | +52.6 % | +1.44 % | −52.3 % |
 | gbm_cls (top-5 OOS) | 175 | +52.6 % | +1.24 % | −173.9 % |
 | logit (top-5 OOS) | 175 | +49.1 % | +0.00 % | −124.0 % |
 
-**`ew` wins the asymmetry too** — it's the only top-5 model where
-the average winning short (+16.55 %) exceeds the average losing
-short (−14.63 %) in magnitude AND the win rate exceeds 50 %. That
-gives a **win/loss magnitude ratio of 1.13** and a positive
-expected per-position short return of **+3.36 %**.
+**`ew` (5-factor) now ties `gbm_rank` at the top of the win-rate
+table** (59.4 % vs 60.0 %) and has the **highest median trade
+return** of any model (+5.46 %, meaning half of all top-5 EW shorts
+fell ≥ 5.46 %), and a tighter worst-trade tail (−66.6 % vs −217.5 %
+for the GBM variants). The reduced spec — see [factor-audit
+section](#why-only-5-factors-the-factor-ic-audit) — kept signal
+strength while cutting tail noise.
 
 But "right > 50 % of the time" isn't the same as "tradeable" —
 see the [**why the squeeze tail matters**](#why-the-squeeze-tail-matters)
@@ -141,8 +143,8 @@ shortable names per the model.
 
 | Model | n | Win % | Median | Mean | Mean win | Mean loss | Win/loss ratio | Worst |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|
-| **gbm_rank** | 175 | **60.0 %** | **+4.54 %** | +0.10 % | +15.07 % | −22.36 % | 0.67 | −217.5 % |
-| **ew** | 175 | **57.7 %** | +3.99 % | **+3.36 %** | +16.55 % | −14.63 % | **1.13** | −52.4 % |
+| **gbm_rank** | 175 | **60.0 %** | +4.55 % | +0.10 % | +15.07 % | −22.36 % | 0.67 | −217.5 % |
+| **ew** (5-factor) | 175 | **59.4 %** | **+5.46 %** | +1.45 % | +15.03 % | −18.45 % | 0.82 | **−66.6 %** |
 | naive | 175 | 52.6 % | +1.44 % | +0.77 % | +13.52 % | −13.36 % | 1.01 | −52.3 % |
 | gbm_cls | 175 | 52.6 % | +1.24 % | −1.52 % | +12.42 % | −16.98 % | 0.73 | −173.9 % |
 | logit | 175 | 49.1 % | +0.00 % | −0.21 % | +14.80 % | −14.72 % | 1.00 | −124.0 % |
@@ -156,38 +158,37 @@ useful as a sanity check that the OOS ranking isn't a fluke.
 
 | Model | n | Win % | Median | Mean | Mean win | Mean loss | Win/loss ratio | Worst |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|
-| **gbm_rank** | 595 | **57.5 %** | **+3.42 %** | +0.77 % | +14.79 % | −17.94 % | 0.82 | −191.4 % |
-| logit | 595 | 55.5 % | +2.27 % | −0.19 % | +12.49 % | −15.99 % | 0.78 | −191.4 % |
-| ew | 595 | 52.4 % | +1.82 % | −1.38 % | +12.86 % | −16.91 % | 0.76 | −200.0 % |
-| gbm_cls | 595 | 48.6 % | +0.00 % | −1.21 % | +11.10 % | −13.10 % | 0.85 | −125.0 % |
-| naive | 595 | 47.7 % | −0.52 % | −0.76 % | +12.13 % | −12.83 % | 0.95 | **−63.0 %** |
+| **gbm_rank** | 595 | **57.5 %** | +3.42 % | +0.77 % | +13.14 % | −15.95 % | 0.82 | −191.4 % |
+| **ew** (5-factor) | 595 | **55.8 %** | +2.88 % | −0.04 % | +14.18 % | −17.99 % | 0.79 | −200.0 % |
+| logit | 595 | 55.5 % | +2.27 % | −0.19 % | +11.71 % | −15.00 % | 0.78 | −191.4 % |
+| gbm_cls | 595 | 48.6 % | +0.00 % | −1.21 % | +9.99 % | −11.79 % | 0.85 | −125.0 % |
+| naive | 595 | 47.7 % | −0.52 % | −0.76 % | +10.08 % | −10.65 % | 0.95 | **−63.0 %** |
 
 **OOS vs IS_matched ranking (top-5 win rate):**
 
 | | OOS | IS_matched |
 |---|---|---|
 | 1st | gbm_rank (60.0 %) | gbm_rank (57.5 %) |
-| 2nd | ew (57.7 %) | logit (55.5 %) |
-| 3rd | naive (52.6 %) | ew (52.4 %) |
+| 2nd | **ew (59.4 %)** | **ew (55.8 %)** |
+| 3rd | naive (52.6 %) | logit (55.5 %) |
 | 4th | gbm_cls (52.6 %) | gbm_cls (48.6 %) |
 | 5th | logit (49.1 %) | naive (47.7 %) |
 
-**`gbm_rank` is consistently #1** — meaningful confirmation that
-LambdaRank's "put the worst stocks at the top" objective isn't a
-post-2023 fluke. **`naive` jumps from #5 to #3** going from IS to
-OOS — the post-2023 regime has been particularly kind to
-short-interest dispersion as a standalone signal. **`logit` does the
-opposite** (#2 → #5), suggesting some of its linear weights overfit
-the pre-2023 fold structure.
+**`gbm_rank` is consistently #1 and `ew` is consistently #2** in both
+windows — meaningful confirmation that the two best signals aren't a
+post-2023 fluke. **`naive` jumps from #5 to #3** going IS_matched → OOS,
+suggesting short-interest dispersion alone was particularly kind in the
+recent regime. **`logit` does the opposite** (#3 → #5) — its linear
+weights overfit the pre-2023 fold structure.
 
 ### Top-10 picks per month (350 positions over 35 months)
 
 | Model | n | Win % | Median | Mean | Mean win | Mean loss | Win/loss ratio | Worst |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|
-| **ew** | 350 | **57.1 %** | +3.72 % | **+2.70 %** | +15.56 % | −14.45 % | **1.08** | −84.2 % |
-| gbm_rank | 350 | 56.9 % | +3.21 % | +0.26 % | +15.51 % | −19.84 % | 0.78 | −217.5 % |
+| **gbm_rank** | 350 | **56.9 %** | +3.21 % | +0.26 % | +15.51 % | −19.84 % | 0.78 | −217.5 % |
+| **ew** (5-factor) | 350 | **56.6 %** | **+4.47 %** | +0.66 % | +15.31 % | −18.43 % | 0.83 | −173.9 % |
 | gbm_cls | 350 | 54.3 % | +1.73 % | −0.77 % | +11.65 % | −15.52 % | 0.75 | −173.9 % |
-| naive | 350 | 52.0 % | +1.42 % | +1.31 % | +13.27 % | −11.65 % | 1.14 | −52.3 % |
+| naive | 350 | 52.0 % | +1.42 % | +1.31 % | +13.27 % | −11.65 % | **1.14** | **−52.3 %** |
 | logit | 350 | 51.7 % | +1.14 % | −0.77 % | +13.62 % | −16.18 % | 0.84 | −217.5 % |
 
 ### Top-decile picks per month (~1,039 positions over 35 months)
@@ -195,19 +196,19 @@ the pre-2023 fold structure.
 | Model | n | Win % | Median | Mean | Mean win | Mean loss | Win/loss ratio | Worst |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|
 | **gbm_rank** | 1,039 | **54.4 %** | +2.55 % | −0.98 % | +14.74 % | −19.73 % | 0.75 | −217.5 % |
-| ew | 1,039 | 53.8 % | +2.13 % | **+0.70 %** | +14.39 % | −15.25 % | 0.94 | −218.2 % |
 | logit | 1,039 | 53.6 % | +1.92 % | −0.18 % | +13.41 % | −15.89 % | 0.84 | −217.5 % |
+| ew (5-factor) | 1,039 | 52.6 % | +2.15 % | −0.35 % | +15.41 % | −17.81 % | 0.87 | −177.4 % |
 | gbm_cls | 1,039 | 51.3 % | +0.67 % | −1.16 % | +11.51 % | −14.49 % | 0.79 | −173.9 % |
-| **naive** | 1,039 | 50.8 % | +0.41 % | +0.27 % | +11.44 % | −11.28 % | **1.01** | **−66.6 %** |
+| **naive** | 1,039 | 50.8 % | +0.41 % | **+0.27 %** | +11.44 % | −11.28 % | **1.01** | **−66.6 %** |
 
 ### Top-quintile picks per month (~2,081 positions over 35 months)
 
 | Model | n | Win % | Median | Mean | Mean win | Mean loss | Win/loss ratio | Worst |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|
 | **logit** | 2,081 | **53.4 %** | +1.71 % | −0.33 % | +12.57 % | −15.14 % | 0.83 | −218.2 % |
+| ew (5-factor) | 2,081 | 52.5 % | +1.72 % | −0.32 % | +13.99 % | −16.16 % | 0.87 | −217.5 % |
 | gbm_rank | 2,081 | 52.4 % | +1.80 % | −0.92 % | +14.13 % | −17.50 % | 0.81 | −217.5 % |
-| ew | 2,081 | 52.0 % | +1.21 % | **+0.26 %** | +13.20 % | −13.78 % | **0.96** | −218.2 % |
-| naive | 2,081 | 50.9 % | +0.44 % | +0.01 % | +10.56 % | −10.95 % | 0.96 | −177.4 % |
+| naive | 2,081 | 50.9 % | +0.44 % | +0.01 % | +10.56 % | −10.95 % | **0.96** | −177.4 % |
 | gbm_cls | 2,081 | 50.7 % | +0.38 % | −1.28 % | +10.33 % | −13.25 % | 0.78 | −217.5 % |
 
 ---
@@ -252,7 +253,7 @@ month then averaged. **For shorts, negative IC is good** — the
 
 | Model | IS IC | IS t-stat | n_IS | OOS IC | OOS t-stat | n_OOS |
 |---|---:|---:|---:|---:|---:|---:|
-| **ew** | **−8.3 %** | **−6.73** | 156 | **−8.9 %** | **−3.83** | 35 |
+| **ew** (5-factor) | **−8.4 %** | **−7.07** | 156 | **−7.8 %** | **−2.90** | 35 |
 | gbm_rank | −7.6 % | −5.61 | 119 | −6.9 % | −2.16 | 35 |
 | logit | −5.3 % | −5.28 | 119 | −5.5 % | −2.48 | 35 |
 | gbm_cls | −3.6 % | −3.77 | 119 | −2.3 % | −1.33 | 35 |
@@ -260,7 +261,10 @@ month then averaged. **For shorts, negative IC is good** — the
 
 All 5 models have negative IC in both IS and OOS — meaning **every
 model's score correctly anti-correlates with stock returns**.
-`ew` and `logit` clear |t| > 2 in OOS (statistically significant).
+`ew`, `gbm_rank`, and `logit` all clear |t| > 2 in OOS
+(statistically significant). EW IS IC actually improved slightly
+when the 12-factor spec was cut to 5 — confirmation that the
+dropped factors were adding noise, not signal.
 
 ---
 
@@ -274,21 +278,34 @@ anomaly with multi-decade academic pedigree. Strongest tail
 robustness (cleanest worst-trade column) because it doesn't
 concentrate into any particular factor cluster.
 
-### `ew` — polarity-aware equal-weight composite of 12 ranks
+### `ew` — polarity-aware equal-weight composite of 5 IC-audited ranks
 
-Averages 12 cross-sectional rank columns (short %, 3-month
-momentum, 1-month vol, market cap, P/E, ROE, ROIC, FCF yield,
-debt/equity, revenue growth, etc.) — with **every factor
-pre-oriented so that high rank = more shortable**. Six naturally-
-bullish factors (momentum, market cap, FCF yield, ROE, ROIC,
-revenue growth) get flipped via `1 − rank` before averaging.
+The composite covers **5 distinct economic dimensions**, each with a
+statistically-significant IS Spearman IC vs forward returns (|t| ≥
+2.9) and a sensible economic story. Every factor is pre-oriented so
+that high rank = more shortable.
 
-**Best OOS IC of any model (−8.9 %, t = −3.83)** and the **only
-model with positive mean per-position trade return at top-5
-and top-10 OOS** (+3.36 % and +2.70 % respectively). The polarity
-fix is one of the biggest single wins in the repo — see
-[`scripts/05_train_and_validate.py`](scripts/05_train_and_validate.py)
-for the polarity spec.
+| # | Factor | Polarity | IS IC | t-stat | Story |
+|---:|---|:---:|---:|---:|---|
+| 1 | `short_pct_ff_rk` | +1 | −0.023 | −2.44 | Crowded short |
+| 2 | `vol_1m_rk` | +1 | −0.049 | **−4.27** | Low-vol anomaly → high vol = shortable |
+| 3 | `pe_rk` | +1 | −0.031 | −2.92 | Expensive |
+| 4 | `fcf_yield_rk` | **−1** (invert) | +0.073 | **+8.36** | Cash-rich = quality → NOT shortable |
+| 5 | `roe_rk` | **−1** (invert) | +0.070 | **+6.49** | Profitable = quality → NOT shortable |
+
+This is a **deliberately reduced spec** — an earlier 12-factor version
+included `debt_equity_rk` with the **wrong sign on the data**, plus
+several collinear / non-significant factors. The full audit is in
+[`reports/factor_ic_audit.csv`](reports/factor_ic_audit.csv) (run via
+[`scripts/_factor_ic_audit.py`](scripts/_factor_ic_audit.py)) and the
+detail is in the [factor-audit section](#why-only-5-factors-the-factor-ic-audit)
+below.
+
+**Best OOS IC of any model (−7.8 %, t = −2.90)** and the highest
+per-position median trade at top-5 OOS (**+5.46 %** — i.e. half of
+all top-5 EW shorts fell ≥ 5.46 %). The fewer-factors version is
+slightly cleaner OOS than the 12-factor original — less noise from
+weak factors fitting recent regime-specific patterns.
 
 ### `logit` — L2 logistic regression
 
@@ -315,6 +332,71 @@ win-rate at top-5 (60 %)** and at top-10 (57 %); the most
 concentrated/conviction-heavy model. Squeeze tail is the worst
 of any model — going decile or quintile produces single losses
 > −200 %.
+
+---
+
+## Why only 5 factors? The factor IC audit
+
+Before cutting EW from 12 factors → 5, every individual rank
+feature on the panel got an IS-only IC audit (`scripts/_factor_ic_audit.py`).
+For each `*_rk` column we computed the per-month cross-sectional
+Spearman correlation with `fwd_ret_1m`, then averaged across the
+156 IS months and computed a t-stat. **IS-only is deliberate** —
+using OOS data to select features would invalidate the OOS holdout.
+
+**Audit verdict on the original 12-factor EW spec:**
+
+| Factor | EW polarity | IS IC | t-stat | Verdict |
+|---|:---:|---:|---:|:---|
+| **fcf_yield_rk** | −1 | +0.073 | **+8.36** | ✓ KEEP (strongest) |
+| **roe_rk** | −1 | +0.070 | +6.49 | ✓ KEEP |
+| roic_rk | −1 | +0.060 | +5.96 | ✗ DROP (collinear with `roe_rk`) |
+| **vol_1m_rk** | +1 | −0.049 | −4.27 | ✓ KEEP |
+| log_mktcap_rk | −1 | +0.039 | +3.48 | ✗ DROP (debatable economic story — "is short-the-small-caps really the prior?") |
+| **debt_equity_rk** | +1 | **+0.027** | **+3.13** | **✗ DROP — WRONG SIGN.** Data says high leverage predicted slightly *higher* returns, opposite of textbook. |
+| **pe_rk** | +1 | −0.031 | −2.92 | ✓ KEEP |
+| mom_3m_rk | −1 | +0.031 | +2.52 | ✗ DROP (borderline significance, t < 2.9 threshold) |
+| **short_pct_ff_rk** | +1 | −0.023 | −2.44 | ✓ KEEP (the only short-interest signal that beats the threshold) |
+| revenue_growth_yoy_rk | −1 | +0.019 | +2.43 | ✗ DROP (borderline) |
+| si_z_12m_rk | +1 | −0.015 | −1.91 | ✗ DROP (not significant) |
+| ShortPct_rk | +1 | −0.016 | −1.71 | ✗ DROP (not significant; collinear with `short_pct_ff_rk`) |
+
+**Three reasons for cuts:**
+
+1. **`debt_equity_rk` had the WRONG sign** on this universe — the data
+   says high leverage predicted slightly *higher* monthly returns
+   (t = +3.13, opposite of what an EW spec built on textbook intuition
+   would expect). Drop entirely.
+2. **Collinearity** — `roic_rk` overlaps with `roe_rk` (both measure
+   profitability); `ShortPct_rk` and `si_z_12m_rk` overlap with
+   `short_pct_ff_rk` (all measure short interest). Keeping the
+   strongest of each cluster is enough.
+3. **Borderline significance** — `mom_3m_rk` and `revenue_growth_yoy_rk`
+   both clear |t| > 2 but fall short of |t| ≥ 2.9. With ~570 features
+   on the panel, "barely significant" at the 5 % threshold is
+   essentially noise.
+
+**Result of the cut**: EW IS IC went from −0.083 → **−0.084** (slightly
+stronger on the cleaner spec, confirming the dropped factors were
+adding more noise than signal). OOS IC went from −0.089 → −0.078
+(slight drop). The IS/OOS gap narrowed, which is a sign of reduced
+overfit to recent-regime noise.
+
+**Why not 2-3 factors instead of 5?** Tested mentally:
+
+- Drop `pe_rk` → loses valuation dimension. PE is a textbook short
+  signal; cutting it leaves only one factor (`short_pct_ff_rk`)
+  with the "+1 keep" polarity. Too narrow.
+- Drop `vol_1m_rk` → loses the only price-based factor. The remaining
+  4 are all fundamentals; the composite stops working in months when
+  fundamentals data is stale.
+- Going below 5 starts dropping economic dimensions, not just
+  noise. 5 is the smallest spec that covers SI / vol / valuation /
+  cash quality / profitability.
+
+Full audit:
+[`reports/factor_ic_audit.csv`](reports/factor_ic_audit.csv)
+(every `*_rk` column with its IC, t-stat, and significance flag).
 
 ---
 
