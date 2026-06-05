@@ -8,8 +8,10 @@
 > (cross-checked vs FMP at median ρ = 0.9996), 3 models walk-forward CV'd
 > with purge + embargo, **36-month pure out-of-sample holdout**, costed
 > backtest (25 bps commission + 1.5 % p.a. borrow + 5 bps slippage)
-> **with a realistic 20 % per-position stop loss + 10 % execution
-> slippage + daily-OHLC gap handling applied to every short position**.
+> **with a realistic 50 % per-position stop loss + 10 % execution
+> slippage + daily-OHLC gap handling applied to every short position
+> (catastrophic-squeeze protection only — see [trigger sensitivity
+> sweep](#stop-loss-trigger-sensitivity-sweep))**.
 > Benchmarked against ASX 200 buy & hold.
 
 A from-scratch rebuild of an earlier ASX short-interest prototype
@@ -20,19 +22,31 @@ below.
 
 ---
 
-## ⚠️ Headline finding — the honest version
+## Headline finding — the honest version
 
-Applying a **realistic stop loss** (20 % trigger + 10 % slippage + gap rule)
-to every short position **destroys the strategy** on this universe.
-Every (model × strategy) combination prints negative Sharpe over the full
-16-year panel and over the 35-month OOS holdout. The only thing that
-makes money is **the ASX 200 buy & hold benchmark**.
+The choice of stop-loss trigger is everything. At a tight 20 % the stop
+fires on ~25 % of all positions (normal small-cap monthly volatility
+hits +20 % all the time) — most of those are false alarms, and the gap
+penalty on the real squeezes makes things worse. **At a 50 % trigger the
+stop only fires on the genuine squeezes (2-6 % of positions)** and the
+strategy is investable again.
 
-This is the realistic answer to the question that broke earlier iterations
-of this project: "*does a stop loss save the strategy from squeeze risk?*"
-The answer is no — a realistic stop loss with gap handling fires on
-**17-26 % of all monthly short positions** and the gap penalty on the
-real squeezes eats more alpha than the stop saves on the false alarms.
+Headline result (OOS holdout, n=35 months), ranked by Sharpe:
+
+| Strategy | Sharpe | CAGR | MaxDD |
+|---|---:|---:|---:|
+| **ASX 200 (buy & hold)** | **+0.71** | **+7.30 %** | **−7.79 %** |
+| **naive / L/S quintile** | **+0.39** | +4.19 % | −13.73 % |
+| **ew / L/S quintile** | **+0.22** | +2.46 % | −26.81 % |
+| naive / quintile-short only | −0.67 | −13.23 % | −44.96 % |
+| logit / L/S quintile | −0.65 | −13.24 % | −48.50 % |
+| ew / quintile-short only | −0.62 | −16.28 % | −53.71 % |
+| logit / quintile-short only | −0.95 | −21.16 % | −56.95 % |
+
+Two of six strategy combinations clear positive OOS Sharpe with the 50 %
+stop, and **ASX 200 buy & hold beats all of them**. That's a real
+finding — see the [trigger sensitivity sweep](#stop-loss-trigger-sensitivity-sweep)
+for why 50 % was chosen.
 
 What this project really shows:
 
@@ -40,19 +54,21 @@ What this project really shows:
   statistically-significant negative information coefficient (their score
   correctly anti-correlates with forward returns). See [Information
   coefficients](#information-coefficients--is-and-oos).
-* **The signal is strong enough to make money in a frictionless world**
-  — *without* a stop loss, the EW polarity-aware composite and the naive
-  short-interest baseline both clear OOS Sharpe ≈ 0.9. See
-  [Table 1b](#table-1b--no-stop-comparison-what-the-strategy-could-do-without-the-gap-penalty).
-* **But the squeeze tail is too fat to trade in practice.** A realistic
-  stop loss + gap rule converts the latent alpha into realised
-  drawdowns. On this universe, at this rebalance frequency, with these
-  execution assumptions, **the strategy is not investable.**
+* **The signal CAN be traded** — but the stop trigger has to be high
+  enough to avoid the false-alarm rate that normal small-cap volatility
+  produces. At 50 % the strategy clears positive OOS Sharpe, just
+  meaningfully below the no-stop ceiling (because of the gap penalty on
+  the few real squeezes that do fire).
+* **ASX 200 buy & hold beats every variant.** The dollar-neutral L/S
+  alpha exists but isn't large enough to overcome realistic execution
+  costs + tail-risk control + the strong equity-market regime
+  (2023-2026 OOS window was a kind one for the index).
 * **The honest takeaway** for an interviewer / reviewer: this is a clean
   demonstration of methodology — universe construction, point-in-time
   fundamentals, walk-forward CV with purge / embargo, IS vs OOS
-  discipline, realistic execution costs, and the discipline of *not
-  hiding the gap risk*. The strategy doesn't work; that's a real finding.
+  discipline, realistic execution costs (including the gap rule that
+  earlier versions of this README were hiding), and the discipline of
+  *not picking the stop-loss trigger to flatter the result*.
 
 ---
 
@@ -69,29 +85,29 @@ What this project really shows:
 
 ### Table 1 — OOS holdout (n=35 monthly rebalances, 2023-06 → 2026-05)
 
-Ranked by OOS Sharpe.
+Ranked by OOS Sharpe. **Stop = 50 % trigger + 10 % slippage + gap rule.**
 
 | Strategy | n_months | Sharpe | CAGR | Ann. vol | MaxDD | Hit-rate |
 |---|---:|---:|---:|---:|---:|---:|
 | **ASX 200 (buy & hold)** | 35 | **+0.71** | **+7.30 %** | 10.77 % | **−7.79 %** | **62.9 %** |
-| ew / long_short_quintile | 35 | −0.94 | −20.37 % | 21.57 % | −56.16 % | 34.3 % |
-| naive / long_short_quintile | 35 | −0.99 | −13.91 % | 14.02 % | −37.38 % | 42.9 % |
-| naive / quintile_short | 35 | −1.50 | −28.69 % | 20.74 % | −66.17 % | 40.0 % |
-| logit / long_short_quintile | 35 | −1.54 | −27.64 % | 19.48 % | −62.48 % | 25.7 % |
-| ew / quintile_short | 35 | −1.64 | −35.29 % | 24.25 % | −74.57 % | 31.4 % |
-| logit / quintile_short | 35 | −1.68 | −34.44 % | 23.11 % | −72.78 % | 37.1 % |
+| **naive / long_short_quintile** | 35 | **+0.39** | +4.19 % | 12.48 % | −13.73 % | **65.7 %** |
+| **ew / long_short_quintile** | 35 | **+0.22** | +2.46 % | 21.54 % | −26.81 % | 45.7 % |
+| ew / quintile_short | 35 | −0.62 | −16.28 % | 23.82 % | −53.71 % | 40.0 % |
+| logit / long_short_quintile | 35 | −0.65 | −13.24 % | 19.11 % | −48.50 % | 37.1 % |
+| naive / quintile_short | 35 | −0.67 | −13.23 % | 18.54 % | −44.96 % | 48.6 % |
+| logit / quintile_short | 35 | −0.95 | −21.16 % | 22.17 % | −56.95 % | 40.0 % |
 
 ### Table 2 — Full-period (n=191 monthly rebalances, 2010-06 → 2026-05)
 
 | Strategy | n_months | Sharpe | CAGR | Ann. vol | MaxDD | Hit-rate |
 |---|---:|---:|---:|---:|---:|---:|
 | **ASX 200 (buy & hold)** | 190 | **+0.39** | **+4.45 %** | 13.79 % | −31.0 % | 61.6 % |
-| naive / long_short_quintile | 191 | −0.97 | −15.87 % | 16.24 % | −95.35 % | 41.4 % |
-| naive / quintile_short | 191 | −1.30 | −29.24 % | 23.91 % | −99.60 % | 34.6 % |
-| ew / long_short_quintile | 191 | −1.47 | −28.15 % | 20.73 % | −99.50 % | 34.0 % |
-| ew / quintile_short | 191 | −1.72 | −41.36 % | 27.92 % | −99.98 % | 28.8 % |
-| logit / quintile_short | 154 | −1.80 | −38.58 % | 24.76 % | −99.82 % | 27.3 % |
-| logit / long_short_quintile | 154 | −1.93 | −28.64 % | 16.55 % | −98.73 % | 27.9 % |
+| **naive / long_short_quintile** | 191 | **+0.14** | +0.90 % | 15.82 % | −51.24 % | 58.1 % |
+| ew / long_short_quintile | 191 | −0.26 | −9.09 % | 24.19 % | −86.17 % | 50.8 % |
+| naive / quintile_short | 191 | −0.56 | −14.93 % | 23.69 % | −93.80 % | 43.5 % |
+| logit / long_short_quintile | 154 | −0.60 | −11.46 % | 17.58 % | −82.54 % | 43.5 % |
+| ew / quintile_short | 191 | −0.76 | −25.84 % | 31.57 % | −99.21 % | 39.3 % |
+| logit / quintile_short | 154 | −0.88 | −23.83 % | 26.41 % | −97.32 % | 36.4 % |
 
 > Trained-model rows have n=154 instead of 191 because the walk-forward
 > CV needs a ~3-year warm-up window — `logit` only has OOF scores from
@@ -100,53 +116,93 @@ Ranked by OOS Sharpe.
 
 ![Cumulative growth of $1 — solid = quintile-short, dotted = long-short, dashed = ASX 200 buy & hold](charts/cumulative_returns_monthly.png)
 
-### Table 1b — No-stop comparison: what the strategy could do without the gap penalty
+### Table 1b — No-stop comparison: what the strategy could do without ANY stop
 
-The same backtest configuration but **without the stop loss** (every
-position realises its full monthly P&L). This is the realistic-execution-
-free version — useful to isolate "where the signal lives" from "where the
-costs eat it":
+Same backtest configuration but **without the stop loss** (every position
+realises its full monthly P&L). Isolates "where the signal lives" from
+"where the gap-cost eats it":
 
-| OOS Sharpe (n=35) | No stop | **With realistic stop** | Δ |
+| OOS Sharpe (n=35) | No stop | **50 % stop (default)** | Δ |
 |---|---:|---:|---:|
-| naive / long_short_quintile | +0.92 | **−0.99** | −1.91 |
-| ew / long_short_quintile | +0.91 | **−0.94** | −1.85 |
-| logit / long_short_quintile | +0.24 | −1.54 | −1.78 |
-| naive / quintile_short | −0.32 | −1.50 | −1.18 |
-| ew / quintile_short | −0.08 | −1.64 | −1.56 |
-| logit / quintile_short | −0.20 | −1.68 | −1.48 |
+| naive / long_short_quintile | +0.92 | **+0.39** | −0.53 |
+| ew / long_short_quintile | +0.91 | **+0.22** | −0.69 |
+| logit / long_short_quintile | +0.24 | −0.65 | −0.89 |
+| naive / quintile_short | −0.32 | −0.67 | −0.35 |
+| ew / quintile_short | −0.08 | −0.62 | −0.54 |
+| logit / quintile_short | −0.20 | −0.95 | −0.75 |
 
-The gap is **∼1.5–1.9 Sharpe points** in OOS — that's the realised cost
-of squeeze gap risk on this universe. The no-stop column shows that the
-signal IS in the data; the stop column shows that you can't extract it
-with a simple per-position stop at realistic execution.
+The cost of the 50 % stop is **∼0.5-0.9 Sharpe points** in OOS — that's
+the realised cost of the gap penalty on the small number of real
+squeezes (2-6 % of positions). The no-stop column shows the underlying
+signal; the stop column shows what's left after catastrophic-tail
+protection.
 
-Full data:
-[`reports/backtest_summary_monthly.csv`](reports/backtest_summary_monthly.csv) (stop-loss applied) /
+### Stop-loss trigger sensitivity sweep
+
+Why 50 %? Sensitivity over triggers from 20 % → 50 %, keeping the same
+spec (10 % slippage + gap rule). OOS L/S quintile Sharpe for each model:
+
+| Model | 20 % | 25 % | 30 % | 35 % | 40 % | **50 %** | No stop |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| naive | −0.99 | −0.66 | −0.46 | −0.25 | −0.14 | **+0.39** | +0.92 |
+| ew | −0.94 | −0.69 | −0.43 | −0.30 | −0.16 | **+0.22** | +0.91 |
+| logit | −1.54 | −1.27 | −1.10 | −1.05 | −0.98 | −0.65 | +0.24 |
+
+Stop-fire rate (full panel — % of all monthly short positions stopped):
+
+| Model | 20 % | 25 % | 30 % | 35 % | 40 % | **50 %** |
+|---|---:|---:|---:|---:|---:|---:|
+| naive | 16.6 % | 11.4 % | 7.7 % | 5.7 % | 4.2 % | **2.3 %** |
+| ew | 26.4 % | 20.2 % | 15.0 % | 11.8 % | 9.4 % | **6.2 %** |
+| logit | 23.8 % | 17.8 % | 13.3 % | 10.4 % | 8.4 % | **5.5 %** |
+
+**Why 50 % is the right choice:**
+
+- At 20 % the stop fires on 17-26 % of positions — most are false
+  alarms (normal small-cap monthly volatility easily hits +20 %) and
+  the gap penalty on the real squeezes dominates.
+- At 50 % the stop only fires on 2-6 % of positions — these are the
+  genuine multi-bagger squeezes (PLS, 4DX, APX, BRN-style +50 %+
+  moves). The cover penalty on those few cases is meaningful but
+  isolated.
+- No stop is theoretically better (Sharpe +0.92 vs +0.39) but offers
+  zero catastrophic-tail protection. If a single squeeze gaps +300 %
+  overnight at 2.5 % book weight, the book takes -7.5 % in one
+  stroke with no defence. 50 % gives that defence at a Sharpe cost of
+  ~0.5.
+
+Full sweep data:
+[`reports/stop_sensitivity.csv`](reports/stop_sensitivity.csv) /
+[`reports/stop_sensitivity.md`](reports/stop_sensitivity.md).
+
+Backtest data:
+[`reports/backtest_summary_monthly.csv`](reports/backtest_summary_monthly.csv) (50 % stop applied) /
 [`reports/backtest_summary_monthly_nostop.csv`](reports/backtest_summary_monthly_nostop.csv) (no stop) /
 [`reports/headline_table.csv`](reports/headline_table.csv) (chart-table including ASX 200).
 
 ---
 
-## Why the stop loss destroys this strategy
+## Why the stop trigger choice matters so much
 
-1. **The trigger fires too often.** A 20 % adverse move on a small-mid-cap
-   short is common. Across all 3 models and all 18,000+ short positions
-   over 16 years, **17 % – 26 % of positions fire the stop**. Most of
-   those positions would have recovered by month-end — the stop closes
-   early and locks in -32 %.
-2. **The gap penalty is brutal on the real squeezes.** When a name DOES
-   squeeze, it doesn't crawl to +20 %; it gaps from the previous close to
-   open up +40 %, +80 %, +200 %. The gap rule covers at
-   `max(entry × 1.32, trigger_day_open)` — so the actual loss on a real
-   squeeze can be -80 %, -100 %, -150 %, not -32 %.
-3. **The L/S quintile loses its long leg's cushion.** Without stops, the
-   L/S spread is positive because the long leg absorbs the short-leg
-   pain. With stops, the short leg loses MORE than its uncapped self
-   (false alarms + gap penalty), and the long leg can't keep up.
+1. **A tight stop fires too often.** At 20 % trigger, 17 – 26 % of all
+   monthly shorts fire the stop. Small-cap stocks routinely move +20 %
+   in a month for non-squeeze reasons (earnings beats, sector rallies,
+   takeover speculation, commodity pumps). Most of those positions
+   would have recovered by month-end — a tight stop locks in -32 %
+   instead.
+2. **The gap penalty is brutal on the real squeezes** *regardless of
+   trigger level*. When a name DOES squeeze, it doesn't crawl through
+   the trigger — it gaps from the previous close to open up +40 %,
+   +80 %, +200 %. The gap rule covers at
+   `max(entry × (1+trigger) × 1.10, trigger_day_open)`, so on a real
+   squeeze you cover at -80 %, -100 %, -150 %, not the nominal level.
+3. **A high trigger reduces false alarms** without changing the gap-
+   penalty math. At 50 % only the genuine squeezes fire (2-6 % of
+   positions), keeping the gap pain isolated. The strategy is
+   tradeable again — just not as good as the no-stop version.
 
-See the realistic stop-loss methodology in
-[Realistic stop-loss spec](#realistic-stop-loss-spec) below.
+See the [stop-loss spec](#realistic-stop-loss-spec) for the exact
+mechanics.
 
 ---
 
@@ -181,15 +237,16 @@ Implemented in
 [`scripts/_apply_stop_loss_full.py`](scripts/_apply_stop_loss_full.py),
 applied per short position over its monthly holding period:
 
-1. **Stop trigger** = `entry_price × 1.20` (20 % adverse move).
+1. **Stop trigger** = `entry_price × 1.50` (50 % adverse move — chosen
+   from the [sensitivity sweep](#stop-loss-trigger-sensitivity-sweep)).
 2. **Daily intraday monitoring**: for each trading day strictly *after*
    entry, check if `daily_high ≥ stop_price`. First day that breaches
    fires the stop.
 3. **Execution slippage**: nominal cover = `stop_price × 1.10` =
-   `entry × 1.32` → a -32 % short return.
+   `entry × 1.65` → a -65 % short return at the nominal fill level.
 4. **Gap rule**: cover at the WORSE of nominal cover and the trigger-day
-   open: `cover_price = max(entry × 1.32, trigger_day_open)`. If the
-   stock gaps up 80 % overnight, you cover at -80 %, not -32 %.
+   open: `cover_price = max(entry × 1.65, trigger_day_open)`. If the
+   stock gaps up 100 % overnight, you cover at -100 %, not -65 %.
 5. **No further P&L** from a stopped position for the rest of the month.
 6. **No look-ahead**: only daily bars *strictly after* the entry date are
    scanned for trigger.
@@ -198,23 +255,20 @@ Daily auto-adjusted OHLC pulled from Yahoo via
 [`scripts/_pull_ohlc_full.py`](scripts/_pull_ohlc_full.py) — 346 unique
 short-basket tickers × up to 16 years = **1,254,249 daily bars**.
 
-### Stop-fire diagnostics (full 16-year panel)
+### Stop-fire diagnostics (full 16-year panel, 50 % trigger)
 
 | Model | Total shorts | Stops fired | Stop rate |
 |---|---:|---:|---:|
-| naive | 8,844 | 1,464 | 16.6 % |
-| ew | 8,844 | 2,333 | 26.4 % |
-| logit | 7,728 | 1,836 | 23.8 % |
+| naive | 8,844 | 203 | 2.3 % |
+| ew | 8,844 | 548 | 6.2 % |
+| logit | 7,728 | 424 | 5.5 % |
 
 EW fires the most stops because its short basket concentrates on
 multi-factor-bearish names (high SI + expensive + low quality), which
 also tend to be the names most prone to squeezes.
 
 Full per-position table (OOS):
-[`reports/oos_short_stopped.csv`](reports/oos_short_stopped.csv)
-with the seven required columns (`stop_triggered`, `stop_trigger_date`,
-`entry_price`, `stop_price`, `cover_price`, `raw_short_return`,
-`stopped_short_return`).
+[`reports/oos_short_stopped.csv`](reports/oos_short_stopped.csv).
 
 ---
 

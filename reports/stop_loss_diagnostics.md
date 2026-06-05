@@ -5,17 +5,17 @@
 ## Summary diagnostics
 
 - **Total OOS short positions**: 2,089
-- **Positions stopped**: **523** (**25.0 %** of all short positions)
-- **Average stopped-position loss**: -32.39 %
-- **Median stopped-position loss**: -32.00 %
-- **Worst stopped-position loss**: -100.00 % (uncapped raw would have been -314.04 %)
+- **Positions stopped**: **138** (**6.6 %** of all short positions)
+- **Average stopped-position loss**: -65.60 %
+- **Median stopped-position loss**: -65.00 %
+- **Worst stopped-position loss**: -112.03 % (uncapped raw would have been -314.04 %)
 
 ## Per-position return change
 
 |  | Raw (no stop) | After 20 % stop | Δ |
 |---|---:|---:|---:|
-| Mean trade return | -0.56 % | -2.55 % | -1.99 pp |
-| Median trade return | +1.91 % | +0.34 % | -1.57 pp |
+| Mean trade return | -0.56 % | -1.29 % | -0.73 pp |
+| Median trade return | +1.91 % | +1.85 % | -0.06 pp |
 
 ## Portfolio-level impact
 
@@ -25,21 +25,21 @@ Three columns side-by-side: **Raw** (no stop), **Realistic** (20 % trigger + 10 
 
 |  | Raw | Realistic (gap rule) | Simplified (-32 % cap) | Δ realistic | Δ simplified |
 |---|---:|---:|---:|---:|---:|
-| CAGR | -9.66 % | -28.79 % | +18.34 % | -19.13 pp | +28.01 pp |
-| Ann. vol | 25.76 % | 24.31 % | 19.99 % | -1.45 pp | -5.76 pp |
-| Sharpe | -0.263 | -1.257 | +0.943 | -0.995 | +1.206 |
-| MaxDD | -53.45 % | -68.36 % | -29.38 % | -14.92 pp | +24.06 pp |
+| CAGR | -9.66 % | -16.69 % | +2.56 % | -7.03 pp | +12.22 pp |
+| Ann. vol | 25.76 % | 23.60 % | 22.05 % | -2.16 pp | -3.71 pp |
+| Sharpe | -0.263 | -0.653 | +0.221 | -0.390 | +0.484 |
+| MaxDD | -53.45 % | -54.10 % | -40.32 % | -0.65 pp | +13.13 pp |
 
 ### L/S quintile (long leg unchanged, short leg stopped)
 
 |  | Raw | Realistic (gap rule) | Simplified (-32 % cap) | Δ realistic | Δ simplified |
 |---|---:|---:|---:|---:|---:|
-| CAGR | -27.64 % | -43.87 % | -5.61 % | -16.23 pp | +22.04 pp |
-| Ann. vol | 19.48 % | 22.26 % | 16.62 % | +2.78 pp | -2.86 pp |
-| Sharpe | -1.542 | -2.418 | -0.266 | -0.876 | +1.276 |
-| MaxDD | -62.48 % | -79.72 % | -35.04 % | -17.24 pp | +27.44 pp |
+| CAGR | -13.24 % | -20.80 % | -2.12 % | -7.56 pp | +11.12 pp |
+| Ann. vol | 19.11 % | 20.60 % | 17.31 % | +1.49 pp | -1.81 pp |
+| Sharpe | -0.645 | -1.018 | -0.040 | -0.373 | +0.605 |
+| MaxDD | -48.50 % | -53.22 % | -32.47 % | -4.72 pp | +16.04 pp |
 
 ## Stop-status breakdown
 
-- `NOT_TRIGGERED`: 1,566
-- `STOPPED`: 523
+- `NOT_TRIGGERED`: 1,951
+- `STOPPED`: 138

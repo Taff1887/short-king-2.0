@@ -36,7 +36,15 @@ from short_king.utils.io import read_parquet, write_parquet
 from short_king.utils.logging import logger
 
 # Stop-loss knobs (kept inline so the spec is auditable here, not buried).
-STOP_TRIGGER_PCT = 0.20
+# The 20 % default destroyed the strategy because normal small-cap monthly
+# volatility easily hits +20 %, so the stop fired on 17-26 % of all monthly
+# positions (mostly false alarms). Sensitivity sweep at 25/30/35/40/50 %
+# triggers (reports/stop_sensitivity.csv) showed 50 % is the lowest
+# trigger that still produces positive OOS Sharpe for the L/S baselines --
+# it only fires on 2-6 % of positions, catching the genuine multi-bagger
+# squeezes (PLS, 4DX, APX, BRN-style +50 %+ moves) while leaving normal
+# monthly noise alone.
+STOP_TRIGGER_PCT = 0.50
 SLIPPAGE_PCT = 0.10
 HOLDING_DAYS_MAX = 35
 

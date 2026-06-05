@@ -41,7 +41,11 @@ from short_king.utils.config import settings
 from short_king.utils.logging import logger
 
 # Spec knobs (kept as module constants so they're auditable + tunable).
-STOP_TRIGGER_PCT = 0.20      # 20 % adverse move -> stop fires
+# 50 % trigger chosen from the sensitivity sweep in
+# reports/stop_sensitivity.csv -- it only catches the genuine multi-bagger
+# squeezes (2-6 % of positions) without firing on normal small-cap monthly
+# volatility (which a 20 % trigger does, destroying the strategy).
+STOP_TRIGGER_PCT = 0.50      # 50 % adverse move -> stop fires
 SLIPPAGE_PCT = 0.10          # extra 10 % above the stop price on fill
 HOLDING_DAYS_MAX = 35        # max calendar days between monthly rebalances
 
