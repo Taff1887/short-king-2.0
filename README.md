@@ -161,7 +161,7 @@ into a short-bias frame.
 
 **What it does:** A simple linear classifier that takes all ~25 feature
 ranks as inputs and predicts the probability that the stock's
-4-week-forward return will be **negative**.
+**monthly forward return** will be **negative**.
 
 **The math:** Fits weights *β* to each feature, then
 `prob_down = sigmoid(β · features)`. Score = `prob_down`.
@@ -182,12 +182,12 @@ that interaction. The next two models can.
 
 ### 4. `gbm_cls` — LightGBM binary classifier (non-linear)
 
-**What it does:** Same target as logit (probability that
-4w-forward-return < 0), but the underlying model is a **gradient-boosted
-decision tree**. It builds **400 small trees** in sequence where each
-new tree corrects the errors of the trees built before it. Like asking
-400 experts each "is this stock going to fall?" then taking a
-weighted vote.
+**What it does:** Same target as logit (probability that the **monthly
+forward return** is negative), but the underlying model is a
+**gradient-boosted decision tree**. It builds **400 small trees** in
+sequence where each new tree corrects the errors of the trees built
+before it. Like asking 400 experts each "is this stock going to fall?"
+then taking a weighted vote.
 
 **The math:** Friedman gradient boosting on cross-entropy. Each tree
 splits the feature space (e.g. "is `mom_12w_rk > 0.6` AND
@@ -226,8 +226,9 @@ which names rank highest *within this month's cross-section*. Ranking
 loss directly optimises that.
 
 **Limitation:** Same overfitting risk as `gbm_cls`. Also more
-sensitive to the label horizon: if you change `fwd_ret_4w` to
-`fwd_ret_8w` the ranking changes more than the binary label would.
+sensitive to the label horizon: if you change the monthly forward
+return (`fwd_ret_4w`) to a longer horizon (`fwd_ret_8w`) the ranking
+changes more than the binary label would.
 
 ### Why have so many models?
 
@@ -346,7 +347,7 @@ A reader-friendly walkthrough of the metrics on this page.
 
 ## Information coefficients — IS and OOS
 
-Spearman of model score vs realised 4-week forward return, computed
+Spearman of model score vs realised monthly forward return, computed
 cross-sectionally each month then summarised:
 
 | Model | IS IC | IS t-stat | n_IS | OOS IC | OOS t-stat | n_OOS |
@@ -410,6 +411,11 @@ imputed to 0.5 (neutral) so linear models don't blow up on missing
 fundamentals.
 
 ### 4. Targets
+
+The forward-return label is **4 weeks (≈ 1 calendar month)** — the
+monthly rebalance grid means each (Date, Ticker) row's label is the
+return from this Friday rebalance to the next one (~4 weeks later).
+The column is named `fwd_ret_4w` in the data for legacy reasons.
 
 * **Binary**: `fwd_ret_4w < 0` for the classifier baseline.
 * **Cross-sectional decile rank** of `fwd_ret_4w` (inverted so worst-
