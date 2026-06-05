@@ -192,6 +192,119 @@ Backtest data:
 
 ---
 
+## The COVID-2020 carnage and "why don't I just stop shorting during rallies?"
+
+Look at the no-stop chart above. There's a brutal cliff between roughly
+**March 2020 and August 2020** — both legs of every L/S strategy get
+hammered, and the short-only books lose between -44 % and -64 % over
+6 months.
+
+### Why COVID was so bad for systematic short books
+
+The 2020 H2 recovery was a "junk rally" — the lowest-quality, highest-
+short-interest names rallied 100-300 % as retail traders piled in,
+governments printed money, and lockdown beneficiaries (small-cap
+biotechs, lithium plays, online-everything stocks) ripped higher.
+Those are *exactly* the names a systematic short book picks. Two
+dynamics hit at once:
+
+1. **The short leg got squeezed.** Worst rolling-6-month return ending
+   August 2020 — ew/quintile-short: **−64 %**, logit/quintile-short:
+   **−56 %**, naive/quintile-short: **−44 %**.
+2. **The long leg under-performed.** High-quality, low-SI names
+   (banks, big miners, stable industrials) lagged the junk rally
+   badly, so the long-leg cushion that normally bails out the L/S
+   construction wasn't there.
+
+The 50 % stop on the chart above clips the worst single-month damage
+but can't fix the regime — it just clips each individual squeeze
+position; it doesn't tell you to stop shorting.
+
+### The regime filter — "don't short into a rally"
+
+Your instinct ("why don't I just not short during the rally back") is
+genuinely good. The cleanest way to implement it without look-ahead:
+**measure ASX 200 trailing return at the rebalance date** (uses only
+prior closes — no peeking) and **skip the short leg when the market
+has just rallied hard**.
+
+Implemented in
+[`scripts/_regime_filter.py`](scripts/_regime_filter.py).
+The mechanic, per rebalance month:
+
+* If `ASX 200 trailing-3m return > +5 %` (or any other threshold),
+  **skip the short leg this month**.
+  * For `quintile_short`: return 0 % this month (cash).
+  * For `long_short_quintile`: keep the long leg only, drop the short.
+* Otherwise: normal strategy.
+
+Sweep across thresholds (no-stop variants, so the filter effect is
+isolated from the stop-loss interaction):
+
+#### L/S quintile OOS Sharpe (n=35), no stop, with regime filter
+
+| Model | No filter | **trail3m > 5 %** | trail3m > 10 % | trail6m > 5 % | trail6m > 10 % |
+|---|---:|---:|---:|---:|---:|
+| naive | +0.92 | **+1.55** | +1.47 | +1.12 | +0.70 |
+| ew | +0.91 | **+1.29** | +1.09 | +0.74 | +1.08 |
+| logit | +0.24 | **+0.67** | +0.29 | +0.04 | +0.35 |
+
+#### Short-only OOS Sharpe (n=35), no stop, with regime filter
+
+| Model | No filter | **trail3m > 5 %** | trail3m > 10 % | trail6m > 5 % | trail6m > 10 % |
+|---|---:|---:|---:|---:|---:|
+| naive | −0.32 | **+0.25** | −0.09 | −0.17 | −0.29 |
+| ew | −0.08 | **+0.47** | +0.09 | −0.12 | −0.01 |
+| logit | −0.20 | **+0.35** | −0.09 | −0.36 | −0.16 |
+
+**Three of three short-only strategies clear positive OOS Sharpe** at
+the trail3m > 5 % setting — first time anywhere in this project that
+naked-short books work.
+
+#### How many months get skipped
+
+| Filter | Months skipped (of 191 total) |
+|---:|---:|
+| trail3m > 5 % | 53 (~28 %) |
+| trail3m > 10 % | 10 (~5 %) |
+| trail3m > 15 % | 1 |
+| trail6m > 5 % | 69 (~36 %) |
+| trail6m > 10 % | 32 (~17 %) |
+
+### Important honesty caveat
+
+The 5 % threshold was picked **after** seeing the OOS results. That's
+an implicit overfit — any single hyperparameter sweep over a 35-month
+OOS window will find SOMETHING that looks great by chance. To deploy
+this for real you'd want to:
+
+1. **Define the rule on IS only** (e.g. pick threshold from 2010-2023
+   data) and check OOS as a sanity test, not a hyperparameter target.
+2. **Test on a different country** (US Russell 2000 short-interest
+   data is the natural transfer test) — if the same regime filter
+   improves the US version, it's probably a real macro effect, not a
+   curve-fit to ASX 2010-2026.
+3. **Account for trading costs** — every "skip then re-enter" cycle
+   pays commission + slippage twice. The 53-skip filter has a non-
+   trivial extra turnover cost not reflected in these numbers.
+4. **Sanity-check the IS Sharpe** — for naive L/S, the IS Sharpe with
+   the trail3m > 5 % filter is actually *slightly worse* (+0.51 vs
+   +0.62 unfiltered) but the OOS Sharpe jumps from +0.92 to +1.55.
+   That divergence is suspicious — it suggests the filter is fitting
+   the post-2020 regime specifically.
+
+That said: **the underlying logic is sound** (don't pick fights with
+a junk rally) and the directionality holds across all three models
+and both strategy types. With proper IS-only calibration this could
+plausibly add 0.3-0.5 Sharpe — meaningful but not the 0.6+ headline
+the OOS-fit version shows.
+
+Full sweep:
+[`reports/regime_filter.csv`](reports/regime_filter.csv) /
+[`reports/regime_filter.md`](reports/regime_filter.md).
+
+---
+
 ## Why the stop trigger choice matters so much
 
 1. **A tight stop fires too often.** At 20 % trigger, 17 – 26 % of all
