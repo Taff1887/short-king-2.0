@@ -184,6 +184,114 @@ Full data:
 [`reports/strategy_explore.csv`](reports/strategy_explore.csv) /
 [`reports/strategy_explore.md`](reports/strategy_explore.md).
 
+### Table 4b — Realistic stop-loss with daily-OHLC gap handling
+
+The headline backtest runs with **no stop loss** — every short position
+realises its full uncapped monthly P&L. An earlier iteration of this
+project used a 15 % hard cap on monthly losses with no execution
+slippage, and reported a heroic 3.85 OOS Sharpe. **That number isn't
+real** — it assumed you could exit any position at exactly the trigger
+price with zero gap risk, which is impossible for the squeeze names
+where the stop fires.
+
+This section implements the realistic version. Rule, applied per
+short position over its monthly holding period:
+
+1. **Stop trigger** = `entry_price × 1.20` (20 % adverse move).
+2. **Daily intraday monitoring**: for each trading day strictly *after*
+   the entry date, check if `daily_high ≥ stop_price`. First day that
+   breaches triggers the stop.
+3. **Execution slippage**: nominal cover price = `stop_price × 1.10`
+   = `entry × 1.32` (a -32 % short loss).
+4. **Gap rule**: cover at the *worse* of nominal cover and the
+   trigger-day open: `cover_price = max(entry × 1.32, trigger_day_open)`.
+   If the stock gaps up 80 % overnight, you cover at -80 %, not -32 %.
+5. **No further P&L** from a stopped position for the rest of the
+   month.
+
+Daily auto-adjusted OHLC pulled from Yahoo via
+[`scripts/_pull_ohlc_oos.py`](scripts/_pull_ohlc_oos.py) (224 unique
+OOS tickers × ~777 days each = 173 k daily bars). Stop logic applied
+position-by-position in
+[`scripts/_stop_loss_realistic.py`](scripts/_stop_loss_realistic.py)
+on the 2,089-position OOS short book.
+
+#### Summary diagnostics
+
+- Total OOS short positions: **2,089**
+- Positions stopped: **523 (25.0 %)** — 1 in 4 monthly shorts fires the stop
+- Average stopped-position loss: **−32.4 %**
+- Median stopped-position loss: **−32.0 %** (= entry × 1.32; gap rule
+  didn't kick in for this position because trigger-day open was below
+  the nominal cover)
+- Worst stopped-position loss: **−100.0 %** (gap above stop; raw
+  uncapped would have been −314 %)
+
+#### Portfolio impact — three columns side by side
+
+I report **two** stop versions:
+
+- **Realistic** — the spec above (20 % trigger + 10 % slippage + gap rule)
+- **Simplified** — a -32 % monthly cap with **no gap handling** (the
+  unrealistic "you can always exit at trigger" baseline that earlier
+  versions of this README used implicitly)
+
+|  | Raw (no stop) | Realistic (gap rule) | Simplified (-32 % cap) |
+|---|---:|---:|---:|
+| **L/S quintile CAGR** | +2.86 % | **−19.12 %** | +33.35 % |
+| **L/S quintile Sharpe** | +0.24 | **−1.03** | **+2.08** |
+| **L/S quintile Ann vol** | 18.5 % | 18.7 % | 14.5 % |
+| **L/S quintile MaxDD** | −37.1 % | **−51.2 %** | **−6.2 %** |
+| Short-only Sharpe | −0.26 | −1.26 | +0.94 |
+| Mean trade return | −0.56 % | −2.55 % | n/a |
+| Median trade return | +1.91 % | +0.34 % | n/a |
+
+#### What this honestly shows
+
+**The gap rule is doing all the work.** The unrealistic "Simplified"
+column (no gap handling) shows what every previous stop-loss
+backtest in this project implicitly assumed — and it looks fantastic
+(+2.08 Sharpe on the L/S quintile, −6 % MaxDD). But that performance
+**only exists if you can always exit at the trigger price**. In
+reality, squeeze stocks gap *above* the trigger overnight, and you
+cover at whatever the open prints.
+
+When you model that honestly (Realistic column), the stop loss goes
+from saving the strategy to **destroying it**:
+
+- **L/S Sharpe: +0.24 → −1.03** (drop of 1.27 Sharpe points)
+- **CAGR: +2.86 % → −19.12 %** — the strategy becomes a money-loser
+- **MaxDD: −37 % → −51 %** — the stops *deepen* the drawdown
+  because they convert recoverable squeezes into realised losses
+
+The gap between Simplified (+2.08 Sharpe) and Realistic (−1.03 Sharpe)
+— a **3.1 Sharpe-point** swing — is the entire cost of squeeze gap
+risk on this universe. That's what the old "stop loss helps" claim
+was burying.
+
+**Why is the stop catching the wrong tail?** Because on this universe
+the 20 % trigger fires on **25 % of all monthly shorts** — 1 in 4 —
+and many of those positions would have recovered within the month
+(the stop closes early, locks in a -32 % loss, misses the rebound).
+The stop saves you from genuine squeezes (good) but also catches a
+LOT of false alarms (bad) and pays a large gap penalty when the rare
+real squeezes fire (very bad).
+
+**Verdict**: a realistic per-position stop loss is **not a useful
+risk control on this universe at these realistic execution
+assumptions**. The strategy is better off taking the squeezes
+uncapped at the L/S portfolio level (where the long leg absorbs them)
+than trying to clip them with a per-position trigger that gets
+defeated by gap risk.
+
+Full per-position table with all required columns
+(`stop_triggered`, `stop_trigger_date`, `entry_price`, `stop_price`,
+`cover_price`, `raw_short_return`, `stopped_short_return`,
+`simple_capped_short_return`):
+[`reports/oos_short_stopped.csv`](reports/oos_short_stopped.csv).
+Full diagnostics markdown:
+[`reports/stop_loss_diagnostics.md`](reports/stop_loss_diagnostics.md).
+
 ### Table 5 — What's actually in the universe, and what if we drop the A$100m gate?
 
 **Large caps are already in the universe.** On the most recent
@@ -251,6 +359,43 @@ fund is, they're capturing a *spread*. But it's useful context: a
 genuine alpha because there's no market beta riding underneath it.
 The headline naive L/S quintile finishes at $2.91 — comfortably
 ahead of the index — *with zero market exposure*.
+
+### How many stocks are picked per month? (and why it varies)
+
+A common question — short answer: **it's a fraction of the universe,
+not a fixed number**. Specifically:
+
+- The eligible universe varies per rebalance (because the
+  `investable` flag depends on price coverage + fresh fundamentals
+  + market cap > A$100 m on that date). Over the OOS window
+  (2023-06 → 2026-05) the universe ranges **284 → 306 names** per
+  month, averaging **297**.
+- **Quintile** = top / bottom 20 % by score = ~60 names per leg
+  (`297 × 0.20 ≈ 59`). On every OOS rebalance the short basket
+  contains exactly **57–61 names**, mean **59.7**, median **60**.
+- **Equal-weight inside each leg** — every short gets weight
+  `-1/N_short` and every long gets `+1/N_long`. For a 60-name
+  short basket each position is **-1.67 % of book**.
+- L/S quintile total positions on a typical rebalance: ~120
+  (60 long + 60 short).
+- 35 OOS months × ~60 shorts/month = **2,089 OOS short positions**
+  across 224 unique tickers.
+
+If the universe were only 100 stocks the basket would be 20 names
+per leg. If it grew to 500 it would be 100. **The construction
+is "always 20 %", never "always 10 names"** — important for capacity
+discussion (the strategy scales with the cross-section, not a fixed
+N). The strategy-exploration variants in
+[Table 4](#table-4--strategy-exploration-5-pre-specified-variants-is-only-selection-oos-confirmation)
+demonstrate alternatives:
+
+- **V1 (SI floor + EW)**: only short names with `ShortPct ≥ 3 %`.
+  Basket size *varies by month* — some months 5 names, others 30.
+  Average **~20**.
+- **V2 (absolute conviction gate)**: only short names with EW score > 0.85.
+  Average **~63**. Variable.
+- All other variants (V0, V0b, V3, V4) use the fixed 20 %-of-cross-section
+  quintile -> ~60 shorts every month.
 
 ### What this honestly shows
 
