@@ -404,32 +404,61 @@ _As of the most recent rebalance: **29 May 2026**. Investable universe
 size: 272 names (≥ A$100 m market cap, fresh fundamentals, valid
 adjusted close)._
 
-### Top 10 by consensus across all 5 models
+### Top 10 by the two best signals (`gbm_rank` + `ew`)
 
-The names every model agrees are in the bearish tail. `consensus_rk`
-is the average of each model's cross-sectional percentile rank on
-this date — robust to the different output scales (gbm_rank is
-z-scored; the rest are 0-1).
+Per the [signal-quality results](#headline-finding), `gbm_rank` and
+`ew` are the two highest-Sharpe signals OOS. Both columns are
+**cross-sectional percentile ranks** within today's universe
+(1.00 = most shortable, 0.00 = least). `combo` = average of the two.
+
+| # | Ticker | Company | Mkt Cap (A$m) | Short % | gbm_rank pctile | ew pctile | combo |
+|---:|---|---|---:|---:|---:|---:|---:|
+| 1 | **NVX** | Novonix | 293 | 2.80 | **0.98** | **1.00** | **0.99** |
+| 2 | **CAT** | Catapult Sports | 983 | 5.15 | 0.97 | 0.97 | 0.97 |
+| 3 | **IMU** | Imugene | 107 | 1.47 | 0.94 | 0.99 | 0.97 |
+| 4 | **MSB** | Mesoblast | 1,898 | 8.66 | 0.95 | 0.97 | 0.96 |
+| 5 | **WEB** | Web Travel Group | 943 | 5.56 | 0.96 | 0.96 | 0.96 |
+| 6 | BBN | Baby Bunting | 347 | 0.32 | **0.99** | 0.92 | 0.95 |
+| 7 | TTT | Titomic | 361 | 0.35 | **0.99** | 0.90 | 0.95 |
+| 8 | SBM | St Barbara | 702 | 3.57 | 0.93 | 0.96 | 0.94 |
+| 9 | VUL | Vulcan Energy | 630 | 4.65 | 0.92 | 0.97 | 0.94 |
+| 10 | AQZ | Alliance Aviation | 200 | 0.25 | 0.94 | 0.94 | 0.94 |
+
+### Top 10 by consensus across all 5 models (percentile-ranked)
+
+Every model's cross-sectional percentile rank within today's universe
+— 1.00 = most shortable on that model, 0.00 = least. Using percentile
+ranks (not raw scores) puts every model on the same 0–1 scale so
+they're directly comparable. `consensus_rk` is the simple average
+across the 5 percentile columns.
 
 | # | Ticker | Company | Mkt Cap (A$m) | Short % | naive | ew | logit | gbm_cls | gbm_rank | consensus_rk |
 |---:|---|---|---:|---:|---:|---:|---:|---:|---:|---:|
-| 1 | **MSB** | Mesoblast | 1,898 | 8.66 | 0.934 | **0.972** | 0.676 | 0.435 | −0.375 | **0.909** |
-| 2 | **CAT** | Catapult Sports | 983 | 5.15 | 0.848 | **0.976** | 0.561 | 0.567 | −0.110 | **0.904** |
-| 3 | **TLX** | Telix Pharmaceuticals | 3,794 | **15.15** | **0.993** | 0.845 | 0.584 | 0.533 | −0.841 | 0.896 |
-| 4 | **ILU** | Iluka Resources | 2,488 | 7.53 | 0.900 | 0.914 | 0.619 | 0.557 | −1.310 | 0.890 |
-| 5 | **4DX** | 4D Medical | 1,948 | 10.06 | 0.969 | 0.812 | 0.549 | 0.557 | **+0.285** | 0.887 |
-| 6 | EOS | Electro Optic Systems | 1,821 | 3.59 | 0.748 | 0.800 | 0.604 | 0.562 | −0.423 | 0.865 |
-| 7 | VUL | Vulcan Energy | 630 | 4.65 | 0.831 | **0.969** | 0.578 | 0.438 | −0.632 | 0.855 |
-| 8 | SBM | St Barbara | 702 | 3.57 | 0.745 | **0.955** | 0.584 | 0.465 | −0.548 | 0.854 |
-| 9 | WEB | Web Travel Group | 943 | 5.56 | 0.857 | **0.966** | 0.560 | 0.422 | −0.309 | 0.839 |
-| 10 | ACL | Au Clinical Labs | 533 | 8.35 | 0.924 | 0.903 | 0.569 | 0.533 | −1.642 | 0.839 |
+| 1 | **MSB** | Mesoblast | 1,898 | 8.66 | 0.93 | 0.97 | 0.98 | 0.71 | 0.95 | **0.909** |
+| 2 | **CAT** | Catapult Sports | 983 | 5.15 | 0.84 | 0.97 | 0.78 | 0.96 | 0.97 | 0.904 |
+| 3 | **TLX** | Telix Pharmaceuticals | 3,794 | **15.15** | 0.99 | 0.85 | 0.87 | 0.90 | 0.86 | 0.896 |
+| 4 | **ILU** | Iluka Resources | 2,488 | 7.53 | 0.89 | 0.92 | 0.93 | 0.93 | 0.77 | 0.890 |
+| 5 | **4DX** | 4D Medical | 1,948 | 10.06 | 0.97 | 0.82 | 0.71 | 0.94 | **1.00** | 0.887 |
+| 6 | EOS | Electro Optic Systems | 1,821 | 3.59 | 0.73 | 0.81 | 0.90 | 0.94 | 0.94 | 0.865 |
+| 7 | VUL | Vulcan Energy | 630 | 4.65 | 0.82 | 0.97 | 0.85 | 0.72 | 0.92 | 0.855 |
+| 8 | SBM | St Barbara | 702 | 3.57 | 0.73 | 0.96 | 0.88 | 0.78 | 0.93 | 0.854 |
+| 9 | WEB | Web Travel Group | 943 | 5.56 | 0.85 | 0.96 | 0.76 | 0.67 | 0.96 | 0.839 |
+| 10 | ACL | Au Clinical Labs | 533 | 8.35 | 0.92 | 0.90 | 0.83 | 0.81 | 0.36 | 0.839 |
 
-**MSB, CAT, TLX, ILU, 4DX** are the names where the broadest agreement
-sits — all 5 models flag these as top-decile shortable. **`gbm_rank`'s
-ordering matters most here** since LambdaRank's objective directly
-optimises the "rank the worst stocks at the top" loss; 4DX is its
-only positive-score pick in the top 10 (everything else is negative,
-which is gbm_rank's output range for less-shortable names).
+**MSB, CAT, TLX, ILU, 4DX** are where the broadest agreement sits —
+all 5 models flag them as top-decile shortable. **4DX has the rare
+"all 5 models above 0.70 percentile + at least one model at the very
+top (gbm_rank = 1.00)"** profile — a textbook squeeze candidate the
+whole stack agrees on.
+
+> **Why percentile, not raw score?** Each model's raw output sits on
+> a different scale: naive / ew are 0-1 cross-sectional ranks;
+> logit / gbm_cls are sigmoid probabilities (~0.2 – 0.7); **gbm_rank
+> is raw LambdaRank output (~−4 to +0.4)** — the negative mean is
+> from the optimiser, NOT a polarity flip. A `gbm_rank` raw score of
+> −0.4 actually sits at the 94th percentile within today's universe.
+> Comparing the raw scores side-by-side is misleading; the percentile
+> ranks all live on 0-1 and represent the same thing.
 
 ### Top 5 per individual model — the disagreements are informative
 

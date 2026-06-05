@@ -119,31 +119,77 @@ def main() -> int:
         "",
     ]
 
-    # --- 1. Top by consensus --------------------------------------------------
-    top_cons = latest.sort_values("consensus_rk", ascending=False).head(TOP_CONS).copy()
-    top_cons["Company"] = top_cons["Company"].map(_company_clean)
+    # --- 1. SIMPLEST: top by gbm_rank + ew (the two best signals) -----------
+    # Both as percentile ranks (0-1) so the scale is consistent.
+    latest["combo_gbm_ew"] = (latest["rk_score_gbm_rank"] + latest["rk_score_ew"]) / 2
+    top_combo = latest.sort_values("combo_gbm_ew", ascending=False).head(TOP_CONS).copy()
+    top_combo["Company"] = top_combo["Company"].map(_company_clean)
     rows = []
-    for i, (_, r) in enumerate(top_cons.iterrows(), 1):
+    for i, (_, r) in enumerate(top_combo.iterrows(), 1):
         rows.append([
             i, r["Ticker"], r["Company"],
             f"{r['mktCap'] / 1e6:,.0f}" if pd.notna(r["mktCap"]) else "",
             f"{r['ShortPct']:.2f}" if pd.notna(r["ShortPct"]) else "",
-            *[f"{r[c]:.3f}" if pd.notna(r[c]) else "" for c in score_cols],
-            f"{r['consensus_rk']:.3f}",
+            f"{r['rk_score_gbm_rank']:.2f}",
+            f"{r['rk_score_ew']:.2f}",
+            f"{r['combo_gbm_ew']:.2f}",
         ])
     md_lines += [
-        f"## Top {TOP_CONS} by consensus across all 5 models",
+        f"## Top {TOP_CONS} by the two best signals (gbm_rank + ew, percentile-ranked)",
         "",
-        "The names every model agrees are in the bearish tail (the safest "
-        "picks — if all 5 models cluster on the same names, the signal is "
-        "broad-based rather than driven by any single factor).",
+        "Per the [signal-quality results](#headline-finding), `gbm_rank` and "
+        "`ew` are the two highest-Sharpe signals OOS. Both columns are "
+        "cross-sectional percentile ranks within today's universe (1.00 = most "
+        "shortable, 0.00 = least shortable). `combo` = average of the two.",
         "",
         _md_table(
             rows,
             ["#", "Ticker", "Company", "Mkt Cap (A$m)", "Short %",
-             "score_naive", "score_ew", "score_logit",
-             "score_gbm_cls", "score_gbm_rank", "consensus_rk"],
+             "gbm_rank pctile", "ew pctile", "combo"],
         ),
+        "",
+    ]
+
+    # --- 2. Top by consensus across all 5 models ------------------------------
+    top_cons = latest.sort_values("consensus_rk", ascending=False).head(TOP_CONS).copy()
+    top_cons["Company"] = top_cons["Company"].map(_company_clean)
+    rows = []
+    for i, (_, r) in enumerate(top_cons.iterrows(), 1):
+        # Display PERCENTILE RANKS for all 5 models so the scales are
+        # consistent. Raw gbm_rank scores look weird (-4.0 to +0.4) because
+        # LambdaRank emits an arbitrary-scale relevance value; the actual
+        # cross-sectional rank tells the user what they need to know.
+        rows.append([
+            i, r["Ticker"], r["Company"],
+            f"{r['mktCap'] / 1e6:,.0f}" if pd.notna(r["mktCap"]) else "",
+            f"{r['ShortPct']:.2f}" if pd.notna(r["ShortPct"]) else "",
+            *[f"{r[f'rk_{c}']:.2f}" if pd.notna(r.get(f'rk_{c}')) else "" for c in score_cols],
+            f"{r['consensus_rk']:.3f}",
+        ])
+    md_lines += [
+        f"## Top {TOP_CONS} by consensus across all 5 models (percentile-ranked)",
+        "",
+        "Each model's cross-sectional percentile rank within today's "
+        "universe — 1.00 = most shortable on that model, 0.00 = least. "
+        "Using percentile ranks (not raw scores) puts every model on the "
+        "same 0-1 scale, so they're directly comparable. `consensus_rk` is "
+        "just the average across the 5 percentile columns.",
+        "",
+        _md_table(
+            rows,
+            ["#", "Ticker", "Company", "Mkt Cap (A$m)", "Short %",
+             "naive p", "ew p", "logit p", "gbm_cls p", "gbm_rank p",
+             "consensus_rk"],
+        ),
+        "",
+        "> **Why percentile, not raw score?** Each model's raw output sits on "
+        "a different scale: naive/ew are 0-1 cross-sectional ranks; "
+        "logit/gbm_cls are sigmoid probabilities (~0.2 to 0.7); gbm_rank is "
+        "raw LambdaRank output (~−4 to +0.4 on a normal day, with negative mean "
+        "from the optimiser, NOT a polarity flip). Comparing the raw scores "
+        "side-by-side is misleading. The cross-sectional percentile ranks "
+        "all live on 0-1 and represent the same thing — 'where this name sits "
+        "within today's universe per this model'.",
         "",
     ]
 

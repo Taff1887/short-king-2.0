@@ -11,22 +11,41 @@ _Latest monthly rebalance: **2026-05-29**. Investable universe size: **272 names
 
 Higher = more shortable on every model. `consensus_rk` is the **average of each model's cross-sectional percentile rank** on this date — robust to the different output scales.
 
-## Top 10 by consensus across all 5 models
+## Top 10 by the two best signals (gbm_rank + ew, percentile-ranked)
 
-The names every model agrees are in the bearish tail (the safest picks — if all 5 models cluster on the same names, the signal is broad-based rather than driven by any single factor).
+Per the [signal-quality results](#headline-finding), `gbm_rank` and `ew` are the two highest-Sharpe signals OOS. Both columns are cross-sectional percentile ranks within today's universe (1.00 = most shortable, 0.00 = least shortable). `combo` = average of the two.
 
-| # | Ticker | Company | Mkt Cap (A$m) | Short % | score_naive | score_ew | score_logit | score_gbm_cls | score_gbm_rank | consensus_rk |
+| # | Ticker | Company | Mkt Cap (A$m) | Short % | gbm_rank pctile | ew pctile | combo |
+|---|---|---|---|---|---|---|---|
+| 1 | NVX | Novonix Limited | 293 | 2.80 | 0.98 | 1.00 | 0.99 |
+| 2 | CAT | Catapult Sports Ltd | 983 | 5.15 | 0.97 | 0.97 | 0.97 |
+| 3 | IMU | Imugene Limited | 107 | 1.47 | 0.94 | 0.99 | 0.97 |
+| 4 | MSB | Mesoblast Limited | 1,898 | 8.66 | 0.95 | 0.97 | 0.96 |
+| 5 | WEB | Web Travel Group Ltd | 943 | 5.56 | 0.96 | 0.96 | 0.96 |
+| 6 | BBN | Baby Bunting Grp Ltd | 347 | 0.32 | 0.99 | 0.92 | 0.95 |
+| 7 | TTT | Titomic Limited | 361 | 0.35 | 0.99 | 0.90 | 0.95 |
+| 8 | SBM | St Barbara Limited | 702 | 3.57 | 0.93 | 0.96 | 0.94 |
+| 9 | VUL | Vulcan Energy | 630 | 4.65 | 0.92 | 0.97 | 0.94 |
+| 10 | AQZ | Alliance Aviation | 200 | 0.25 | 0.94 | 0.94 | 0.94 |
+
+## Top 10 by consensus across all 5 models (percentile-ranked)
+
+Each model's cross-sectional percentile rank within today's universe — 1.00 = most shortable on that model, 0.00 = least. Using percentile ranks (not raw scores) puts every model on the same 0-1 scale, so they're directly comparable. `consensus_rk` is just the average across the 5 percentile columns.
+
+| # | Ticker | Company | Mkt Cap (A$m) | Short % | naive p | ew p | logit p | gbm_cls p | gbm_rank p | consensus_rk |
 |---|---|---|---|---|---|---|---|---|---|---|
-| 1 | MSB | Mesoblast Limited | 1,898 | 8.66 | 0.934 | 0.972 | 0.676 | 0.435 | -0.375 | 0.909 |
-| 2 | CAT | Catapult Sports Ltd | 983 | 5.15 | 0.848 | 0.976 | 0.561 | 0.567 | -0.110 | 0.904 |
-| 3 | TLX | Telix Pharmaceutical | 3,794 | 15.15 | 0.993 | 0.845 | 0.584 | 0.533 | -0.841 | 0.896 |
-| 4 | ILU | Iluka Resources | 2,488 | 7.53 | 0.900 | 0.914 | 0.619 | 0.557 | -1.310 | 0.890 |
-| 5 | 4DX | 4Dmedical Limited | 1,948 | 10.06 | 0.969 | 0.812 | 0.549 | 0.557 | 0.285 | 0.887 |
-| 6 | EOS | Electro Optic Sys. | 1,821 | 3.59 | 0.748 | 0.800 | 0.604 | 0.562 | -0.423 | 0.865 |
-| 7 | VUL | Vulcan Energy | 630 | 4.65 | 0.831 | 0.969 | 0.578 | 0.438 | -0.632 | 0.855 |
-| 8 | SBM | St Barbara Limited | 702 | 3.57 | 0.745 | 0.955 | 0.584 | 0.465 | -0.548 | 0.854 |
-| 9 | WEB | Web Travel Group Ltd | 943 | 5.56 | 0.857 | 0.966 | 0.560 | 0.422 | -0.309 | 0.839 |
-| 10 | ACL | Au Clinical Labs | 533 | 8.35 | 0.924 | 0.903 | 0.569 | 0.533 | -1.642 | 0.839 |
+| 1 | MSB | Mesoblast Limited | 1,898 | 8.66 | 0.93 | 0.97 | 0.98 | 0.71 | 0.95 | 0.909 |
+| 2 | CAT | Catapult Sports Ltd | 983 | 5.15 | 0.84 | 0.97 | 0.78 | 0.96 | 0.97 | 0.904 |
+| 3 | TLX | Telix Pharmaceutical | 3,794 | 15.15 | 0.99 | 0.85 | 0.87 | 0.90 | 0.86 | 0.896 |
+| 4 | ILU | Iluka Resources | 2,488 | 7.53 | 0.89 | 0.92 | 0.93 | 0.93 | 0.77 | 0.890 |
+| 5 | 4DX | 4Dmedical Limited | 1,948 | 10.06 | 0.97 | 0.82 | 0.71 | 0.94 | 1.00 | 0.887 |
+| 6 | EOS | Electro Optic Sys. | 1,821 | 3.59 | 0.73 | 0.81 | 0.90 | 0.94 | 0.94 | 0.865 |
+| 7 | VUL | Vulcan Energy | 630 | 4.65 | 0.82 | 0.97 | 0.85 | 0.72 | 0.92 | 0.855 |
+| 8 | SBM | St Barbara Limited | 702 | 3.57 | 0.73 | 0.96 | 0.88 | 0.78 | 0.93 | 0.854 |
+| 9 | WEB | Web Travel Group Ltd | 943 | 5.56 | 0.85 | 0.96 | 0.76 | 0.67 | 0.96 | 0.839 |
+| 10 | ACL | Au Clinical Labs | 533 | 8.35 | 0.92 | 0.91 | 0.82 | 0.90 | 0.65 | 0.839 |
+
+> **Why percentile, not raw score?** Each model's raw output sits on a different scale: naive/ew are 0-1 cross-sectional ranks; logit/gbm_cls are sigmoid probabilities (~0.2 to 0.7); gbm_rank is raw LambdaRank output (~−4 to +0.4 on a normal day, with negative mean from the optimiser, NOT a polarity flip). Comparing the raw scores side-by-side is misleading. The cross-sectional percentile ranks all live on 0-1 and represent the same thing — 'where this name sits within today's universe per this model'.
 
 ## Top 5 per individual model
 
