@@ -397,14 +397,21 @@ def main() -> int:
         )
         return predict_logit_baseline(model, X_te, used_cols).to_numpy()
 
-    logit_score_is = _walkforward_predict(
-        df_is, feat_cols, y_bin_is, _fit_predict_logit,
-        model_name="logit (IS CV)", **wf_common,
+    # ROLLING-REFIT walk-forward across the ENTIRE panel.
+    # No "fit final model on IS, apply to OOS" step -- every prediction is
+    # walk-forward (model refit on each fold using only prior data, then
+    # predicting the next ~6-month test window). This is how the model
+    # would be deployed in production: refit each month, predict next.
+    # Trained models then have OOF predictions from ~mid-2013 (after the
+    # ~3-year walk-forward warm-up) to 2026-05 = ~12.8 years of TRUE
+    # out-of-fold history.
+    logit_score = _walkforward_predict(
+        df, feat_cols, y_bin, _fit_predict_logit,
+        model_name="logit (rolling walk-forward)", **wf_common,
     )
-    logit_score = _is_oos_score(logit_score_is, _fit_predict_logit, y_bin)
 
-    # --- 4. GBM classifier (walk-forward) ------------------------------------
-    logger.info("model: gbm_cls (walk-forward)")
+    # --- 4. GBM classifier (walk-forward across full panel) ------------------
+    logger.info("model: gbm_cls (rolling walk-forward across full panel)")
 
     def _fit_predict_gbm_cls(X_tr, y_tr, X_te, _train_idx):
         model = fit_gbm_classifier(
@@ -414,21 +421,19 @@ def main() -> int:
         )
         return predict_score(model, X_te, list(X_te.columns)).to_numpy()
 
-    gbm_cls_score_is = _walkforward_predict(
-        df_is, feat_cols, y_bin_is, _fit_predict_gbm_cls,
-        model_name="gbm_cls (IS CV)", **wf_common,
+    gbm_cls_score = _walkforward_predict(
+        df, feat_cols, y_bin, _fit_predict_gbm_cls,
+        model_name="gbm_cls (rolling walk-forward)", **wf_common,
     )
-    gbm_cls_score = _is_oos_score(gbm_cls_score_is, _fit_predict_gbm_cls, y_bin)
 
-    # --- 5. GBM ranker (walk-forward) ----------------------------------------
-    logger.info("model: gbm_rank (walk-forward)")
+    # --- 5. GBM ranker (walk-forward across full panel) ----------------------
+    logger.info("model: gbm_rank (rolling walk-forward across full panel)")
 
     def _fit_predict_gbm_rank(X_tr, y_tr, X_te, train_idx):
         # The ranker needs group_dates aligned with the (filtered) training
-        # rows. train_idx is the positional row index into df_is during CV
-        # (and during final-fit) - use it to look up the matching Date.
-        source = df_is
-        group_dates = source.iloc[train_idx][_DATE_COL].reset_index(drop=True)
+        # rows. train_idx is the positional row index into df -- look up
+        # the matching Date so LightGBM can build contiguous query groups.
+        group_dates = df.iloc[train_idx][_DATE_COL].reset_index(drop=True)
         # Sort by date so groups are contiguous (LightGBM ranker requirement).
         order = np.argsort(group_dates.to_numpy(), kind="mergesort")
         X_tr_sorted = X_tr.iloc[order].reset_index(drop=True)
@@ -443,11 +448,10 @@ def main() -> int:
         )
         return predict_score(model, X_te, list(X_te.columns)).to_numpy()
 
-    gbm_rank_score_is = _walkforward_predict(
-        df_is, feat_cols, y_rank_is, _fit_predict_gbm_rank,
-        model_name="gbm_rank (IS CV)", **wf_common,
+    gbm_rank_score = _walkforward_predict(
+        df, feat_cols, y_rank, _fit_predict_gbm_rank,
+        model_name="gbm_rank (rolling walk-forward)", **wf_common,
     )
-    gbm_rank_score = _is_oos_score(gbm_rank_score_is, _fit_predict_gbm_rank, y_rank)
 
     # --- Stack OOF predictions long ------------------------------------------
     period_labels = np.where(is_mask.to_numpy(), "IS", "OOS")

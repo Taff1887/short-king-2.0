@@ -66,17 +66,18 @@ concentrated you make the short list — picking just the model's
 
 | Model | n_OOS positions | Win rate | Median trade | Worst trade |
 |---|---:|---:|---:|---:|
-| **gbm_rank** (top-5 OOS) | 175 | **+60.0 %** | +4.55 % | −217.5 % |
-| **ew** (top-5 OOS, 5-factor) | 175 | **+59.4 %** | **+5.46 %** | **−66.6 %** |
+| **gbm_rank** (top-5 OOS) | 175 | **+65.1 %** | **+7.38 %** | −217.5 % |
+| **ew** (top-5 OOS, 5-factor) | 175 | **+59.4 %** | +5.46 % | **−66.6 %** |
+| gbm_cls (top-5 OOS) | 175 | +58.9 % | +2.00 % | −85.2 % |
 | naive (top-5 OOS) | 175 | +52.6 % | +1.44 % | −52.3 % |
-| gbm_cls (top-5 OOS) | 175 | +52.6 % | +1.24 % | −173.9 % |
-| logit (top-5 OOS) | 175 | +49.1 % | +0.00 % | −124.0 % |
+| logit (top-5 OOS) | 175 | +50.3 % | +0.29 % | −122.5 % |
 
-**`ew` (5-factor) now ties `gbm_rank` at the top of the win-rate
-table** (59.4 % vs 60.0 %) and has the **highest median trade
-return** of any model (+5.46 %, meaning half of all top-5 EW shorts
-fell ≥ 5.46 %), and a tighter worst-trade tail (−66.6 % vs −217.5 %
-for the GBM variants). The reduced spec — see [factor-audit
+Under rolling walk-forward refit, **`gbm_rank` is correctly identifying
+a falling stock 65 % of the time** on the most recent 35-month window
+— half of its top-5 picks fell by ≥ 7.38 %. EW is at 59.4 %; even
+`gbm_cls` clears 50 % now (58.9 %, up from 52.6 % under the previous
+frozen-final-fit setup) because the rolling refit lets it adapt to the
+recent regime. The reduced 5-factor EW spec — see [factor-audit
 section](#why-only-5-factors-the-factor-ic-audit) — kept signal
 strength while cutting tail noise.
 
@@ -141,24 +142,33 @@ stock that falls, across as much history as possible?"**. But "as much
 history as possible" means different things for different models:
 
 * **`naive` and `ew` have zero learned parameters.** No training step,
-  nothing to overfit. They can score every month from **2010-06 onwards
+  nothing to overfit. They score every month from **2010-06 onwards
   — 16 years, ~191 monthly rebalances**. Every month is effectively
   out-of-sample.
-* **`logit` / `gbm_cls` / `gbm_rank` need a walk-forward training
-  window.** The earliest OOF prediction is mid-2013 (after the ~3-year
-  warm-up that walk-forward CV requires). They have **12.8 years of
-  evaluation data — ~154 monthly rebalances**.
-* **The 35-month "pure final-holdout" OOS window** (2023-06 → 2026-05)
-  is the only span where all 5 models get exactly the same data — the
-  trained models' final fit was never exposed to these rows during
-  development. It's the cleanest apples-to-apples comparison but
-  it's a single regime and a small sample (35 monthly rebalances).
+* **`logit` / `gbm_cls` / `gbm_rank` are walk-forward refit every
+  month.** Earliest prediction is mid-2013 (after the ~3-year
+  warm-up). They have **12.8 years of true out-of-fold predictions
+  — ~154 monthly rebalances**.
 
-So the rest of this page shows **three views** — full record (most
-power), IS_matched (apples-to-apples across the 154-month overlap),
-and 35-month pure OOS (cleanest comparison on the same data). They
-all agree on the headline ranking; they differ on the precision of
-the win-rate estimates.
+**Walk-forward refit (rolling) explained:** for the trained models we
+do NOT fit one model and freeze it. Each month's prediction comes
+from a *new* model trained on **only the data available before that
+month**, then applied to the next ~6-month test window. The training
+window expands every fold, so by 2026 the models are training on the
+full 15+ years of prior history. This mimics how a production model
+would be deployed: refit each rebalance, predict the next.
+
+* **The 35-month "OOS" window** (2023-06 → 2026-05) is just the last
+  35 months of that rolling-refit sequence — useful as the most-recent
+  regime check, but **no longer different in kind** from any earlier
+  month (every prediction was OOF). It's preserved in the tables for
+  backward compatibility and as the apples-to-apples comparison span.
+
+So the rest of this page shows **three views**: full record (the
+honest number, every month each model has a prediction for),
+`IS_matched` (apples-to-apples across the 154-month overlap), and
+the last 35 months ("recent-regime" check). The full record is the
+headline.
 
 ---
 
@@ -166,35 +176,35 @@ the win-rate estimates.
 
 This is the headline view — the biggest sample for every model.
 
-### Top-5 picks per month — full record
+### Top-5 picks per month — full record (rolling walk-forward refit)
 
 | Model | Window | n positions | Win rate | Median trade | Mean trade | Worst |
 |---|---|---:|---:|---:|---:|---:|
-| **gbm_rank** | 12.8 yrs (2013-2026) | 770 | **+58.0 %** | +3.77 % | +0.62 % | −217.5 % |
+| **gbm_rank** | 12.8 yrs (2013-2026) | 770 | **+59.2 %** | **+4.52 %** | +0.94 % | −217.5 % |
 | **ew** (5-factor) | **15.9 yrs (2010-2026)** | **955** | **+56.7 %** | +3.57 % | +0.68 % | −200.0 % |
-| logit | 12.8 yrs | 770 | +54.0 % | +2.04 % | −0.19 % | −191.4 % |
+| logit | 12.8 yrs | 770 | +54.3 % | +1.97 % | −0.04 % | −191.4 % |
+| gbm_cls | 12.8 yrs | 770 | +50.9 % | +0.47 % | −0.86 % | −125.0 % |
 | naive | 15.9 yrs | 955 | +50.0 % | +0.00 % | −0.28 % | **−63.0 %** |
-| gbm_cls | 12.8 yrs | 770 | +49.5 % | +0.00 % | −1.28 % | −173.9 % |
 
 ### Top-10 picks per month — full record
 
 | Model | Window | n positions | Win rate | Median trade | Mean trade | Worst |
 |---|---|---:|---:|---:|---:|---:|
-| **gbm_rank** | 12.8 yrs | 1,540 | **+56.3 %** | +3.37 % | +0.19 % | −217.5 % |
+| **gbm_rank** | 12.8 yrs | 1,540 | **+56.3 %** | +3.45 % | +0.00 % | −217.5 % |
 | **ew** (5-factor) | 15.9 yrs | 1,910 | +54.3 % | +2.67 % | +0.15 % | −200.0 % |
-| logit | 12.8 yrs | 1,540 | +53.8 % | +1.65 % | −0.71 % | −221.4 % |
-| gbm_cls | 12.8 yrs | 1,540 | +51.5 % | +0.70 % | −0.84 % | −173.9 % |
-| naive | 15.9 yrs | 1,910 | +50.2 % | +0.10 % | +0.11 % | −81.0 % |
+| logit | 12.8 yrs | 1,540 | +54.2 % | +2.00 % | −0.58 % | −221.4 % |
+| gbm_cls | 12.8 yrs | 1,540 | +52.0 % | +0.79 % | −0.68 % | −139.1 % |
+| naive | 15.9 yrs | 1,910 | +50.2 % | +0.10 % | +0.11 % | **−81.0 %** |
 
 ### Top-decile picks per month — full record
 
 | Model | Window | n positions | Win rate | Median trade | Mean trade | Worst |
 |---|---|---:|---:|---:|---:|---:|
-| **gbm_rank** | 10.7 yrs | 3,844 | **+54.1 %** | +2.28 % | −0.69 % | −221.4 % |
+| **gbm_rank** | 10.7 yrs | 3,844 | **+53.5 %** | +2.05 % | −0.88 % | −221.4 % |
 | ew (5-factor) | 12.2 yrs | 4,395 | +53.1 % | +1.89 % | −0.32 % | −200.0 % |
-| logit | 10.7 yrs | 3,844 | +52.2 % | +1.04 % | −0.50 % | −221.4 % |
-| gbm_cls | 10.7 yrs | 3,844 | +50.3 % | +0.28 % | −1.18 % | −173.9 % |
-| naive | 12.2 yrs | 4,395 | +49.3 % | +0.00 % | −0.32 % | −134.1 % |
+| logit | 10.7 yrs | 3,844 | +53.0 % | +1.45 % | −0.19 % | −221.4 % |
+| gbm_cls | 10.7 yrs | 3,844 | +51.1 % | +0.53 % | −0.94 % | −217.5 % |
+| naive | 12.2 yrs | 4,397 | +49.3 % | +0.00 % | −0.32 % | −134.1 % |
 
 > The "years" column for the decile bucket is shorter (10.7 / 12.2 vs
 > 12.8 / 15.9) because at some early rebalances the universe was
@@ -204,19 +214,28 @@ This is the headline view — the biggest sample for every model.
 **What the long history confirms:**
 
 * **`gbm_rank`** is the highest-win-rate model at every bucket across
-  10+ years. Not a 35-month fluke — over 770 top-5 picks across
-  12.8 years, it picked a falling stock 58 % of the time.
-* **`ew` (5-factor)** is essentially tied with gbm_rank at top-5 (56.7 %
-  vs 58.0 %) and beats it on sample size (955 vs 770 positions, 15.9
-  vs 12.8 years). For a *no-training* composite to keep pace with the
-  best trained model over 16 years is the strongest possible case for
-  the hand-built short signal.
-* **`naive`** sits around 50 % across the full history. Short-interest
-  alone is barely a signal; it needs the rest of the EW factor stack
-  to work.
-* **`gbm_cls`** is essentially noise (49.5 % at top-5 — below random!).
-  The binary-classification objective on this universe doesn't help
-  beyond what logit already extracts.
+  10+ years. Not a recent-regime fluke — over 770 top-5 picks across
+  12.8 years of *rolling-refit* predictions, it picked a falling
+  stock **59.2 %** of the time. The rolling refit explicitly lets the
+  model adapt to each new regime as it appears, which is exactly how
+  a production model would be deployed.
+* **`ew` (5-factor)** keeps pace with gbm_rank despite zero training —
+  56.7 % top-5 win rate over 15.9 years (955 positions). For a
+  no-training composite to be neck-and-neck with a fully-trained
+  rolling-refit ranker is the strongest possible case for the
+  hand-built short signal: the polarity-aware factor selection
+  captures most of what the trained model can learn.
+* **`logit`** sits at 54.3 % top-5 — meaningfully better than naive,
+  but well below gbm_rank and EW. Linear weights can't capture the
+  non-linear interactions that tree models pick up.
+* **`naive`** sits exactly at 50 % across the full history.
+  Short-interest alone is barely a signal once you average across
+  many regimes; it needs the rest of the EW factor stack to clear
+  the coin-flip line.
+* **`gbm_cls`** clears 50 % at top-5 once it's getting refit each
+  month (50.9 %, up from 49.5 % under the old frozen-final-fit
+  setup) — the rolling refit specifically helps the GBM classifier.
+  Still the weakest trained model.
 
 ---
 
@@ -344,9 +363,9 @@ month then averaged. **For shorts, negative IC is good** — the
 | Model | IS IC | IS t-stat | n_IS | OOS IC | OOS t-stat | n_OOS |
 |---|---:|---:|---:|---:|---:|---:|
 | **ew** (5-factor) | **−8.4 %** | **−7.07** | 156 | **−7.8 %** | **−2.90** | 35 |
-| gbm_rank | −7.6 % | −5.61 | 119 | −6.9 % | −2.16 | 35 |
-| logit | −5.3 % | −5.28 | 119 | −5.5 % | −2.48 | 35 |
-| gbm_cls | −3.6 % | −3.77 | 119 | −2.3 % | −1.33 | 35 |
+| **gbm_rank** | **−7.6 %** | **−5.61** | 119 | **−6.7 %** | **−2.04** | 35 |
+| logit | −5.3 % | −5.28 | 119 | −5.8 % | −2.43 | 35 |
+| gbm_cls | −3.6 % | −3.77 | 119 | −2.7 % | −1.34 | 35 |
 | naive | −1.6 % | −1.70 | 156 | −2.1 % | −1.38 | 35 |
 
 All 5 models have negative IC in both IS and OOS — meaning **every
