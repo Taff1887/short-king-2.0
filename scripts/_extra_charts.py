@@ -79,11 +79,12 @@ def main() -> None:
     # 6. Decile-return spread per model (mean fwd_ret by score decile)
     decile_records: list[dict] = []
     for model, g in oof.groupby("model"):
-        g = g.dropna(subset=["score", "fwd_ret_1m"])
+        fwd_col = "fwd_ret_1m" if "fwd_ret_1m" in g.columns else "fwd_ret_4w"
+        g = g.dropna(subset=["score", fwd_col])
         if len(g) < 100:
             continue
         deciles = pd.qcut(g["score"], 10, labels=False, duplicates="drop")
-        means = g.groupby(deciles)["fwd_ret_1m"].mean()
+        means = g.groupby(deciles)[fwd_col].mean()
         for d, r in means.items():
             decile_records.append({"model": model, "decile": int(d), "mean_fwd_ret_1m": float(r)})
     decile_df = pd.DataFrame(decile_records)

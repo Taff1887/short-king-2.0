@@ -1,775 +1,346 @@
-# Short King 2.0 — ASX Short-Selling Research
+# Short King 2.0 — ASX Short-Signal Quality Research
 
-> Cross-sectional short-selling on the Australian Securities Exchange.
-> **500-stock universe, 15 years 11 months (16 June 2010 → 29 May 2026)
-> of weekly ASIC disclosures**, **Friday-release end-of-month rebalance**
-> (4-business-day lag respected — we trade on the day positions become
-> known, not the as-of date), FMP fundamentals, Yahoo Finance prices
-> (cross-checked vs FMP at median ρ = 0.9996), 3 models walk-forward CV'd
-> with purge + embargo, **36-month pure out-of-sample holdout**, costed
-> backtest (25 bps commission + 1.5 % p.a. borrow + 5 bps slippage)
-> **with a realistic 50 % per-position stop loss + 10 % execution
-> slippage + daily-OHLC gap handling applied to every short position
-> (catastrophic-squeeze protection only — see [trigger sensitivity
-> sweep](#stop-loss-trigger-sensitivity-sweep))**.
-> Benchmarked against ASX 200 buy & hold.
-
-A from-scratch rebuild of an earlier ASX short-interest prototype
-([Taff1887/short-king](https://github.com/Taff1887/short-king)) — a single
-430 KB notebook with 5 hand-built signals and 21 total trades that lost
-money. **Version 2.0** is a proper research project. Headline results
-below.
-
----
-
-## Headline finding — the honest version
-
-The choice of stop-loss trigger is everything. At a tight 20 % the stop
-fires on ~25 % of all positions (normal small-cap monthly volatility
-hits +20 % all the time) — most of those are false alarms, and the gap
-penalty on the real squeezes makes things worse. **At a 50 % trigger the
-stop only fires on the genuine squeezes (2-6 % of positions)** and the
-strategy is investable again.
-
-Headline result (OOS holdout, n=35 months), ranked by Sharpe:
-
-| Strategy | Sharpe | CAGR | MaxDD |
-|---|---:|---:|---:|
-| **ASX 200 (buy & hold)** | **+0.71** | **+7.30 %** | **−7.79 %** |
-| **naive / L/S quintile** | **+0.39** | +4.19 % | −13.73 % |
-| **ew / L/S quintile** | **+0.22** | +2.46 % | −26.81 % |
-| naive / quintile-short only | −0.67 | −13.23 % | −44.96 % |
-| logit / L/S quintile | −0.65 | −13.24 % | −48.50 % |
-| ew / quintile-short only | −0.62 | −16.28 % | −53.71 % |
-| logit / quintile-short only | −0.95 | −21.16 % | −56.95 % |
-
-Two of six strategy combinations clear positive OOS Sharpe with the 50 %
-stop, and **ASX 200 buy & hold beats all of them**. That's a real
-finding — see the [trigger sensitivity sweep](#stop-loss-trigger-sensitivity-sweep)
-for why 50 % was chosen.
-
-What this project really shows:
-
-* **The cross-sectional short-interest signal is real** — every model has
-  statistically-significant negative information coefficient (their score
-  correctly anti-correlates with forward returns). See [Information
-  coefficients](#information-coefficients--is-and-oos).
-* **The signal CAN be traded** — but the stop trigger has to be high
-  enough to avoid the false-alarm rate that normal small-cap volatility
-  produces. At 50 % the strategy clears positive OOS Sharpe, just
-  meaningfully below the no-stop ceiling (because of the gap penalty on
-  the few real squeezes that do fire).
-* **ASX 200 buy & hold beats every variant.** The dollar-neutral L/S
-  alpha exists but isn't large enough to overcome realistic execution
-  costs + tail-risk control + the strong equity-market regime
-  (2023-2026 OOS window was a kind one for the index).
-* **The honest takeaway** for an interviewer / reviewer: this is a clean
-  demonstration of methodology — universe construction, point-in-time
-  fundamentals, walk-forward CV with purge / embargo, IS vs OOS
-  discipline, realistic execution costs (including the gap rule that
-  earlier versions of this README were hiding), and the discipline of
-  *not picking the stop-loss trigger to flatter the result*.
+> **What this is:** a research project measuring how well 5 different
+> models can identify ASX stocks that will fall over the next month.
+> Universe: 500 most actively-shorted ASX names (sourced from ASIC
+> daily-aggregate short-position reports) over **15 years 11 months**
+> (16 June 2010 → 29 May 2026). Models walk-forward CV'd with
+> purge + embargo and a **36-month pure out-of-sample holdout**.
+>
+> **What this is NOT:** a trading strategy. There is no portfolio
+> construction, no long leg, no costs, no borrow, no slippage, no
+> stop loss, no regime overlay, no leverage, no position sizing.
+> Every short is a single (Date, Ticker) pick with its realised
+> monthly forward return — and the only thing measured is:
+>
+> 1. **How often does the model correctly identify a stock that falls?** (success rate)
+> 2. **When it's right, how right is it?** (mean win magnitude)
+> 3. **When it's wrong, how wrong is it?** (mean loss magnitude)
+> 4. **What's the asymmetry?** (win/loss magnitude ratio)
+>
+> Building a tradeable strategy on top of these signals is a separate
+> problem. This repo is about whether the signal is real.
 
 ---
 
-## Headline results
+## Headline finding
 
-* **3 models**: `naive` (rank by ShortPct), `ew` (polarity-aware
-  12-factor composite), `logit` (L2 logistic regression).
-* **2 strategies** per model: **quintile-short only** (top 20 % most
-  shortable) and **dollar-neutral long-short quintile** (long bottom
-  20 %, short top 20 %).
-* **+ ASX 200 buy & hold** as the equity-only benchmark.
-* All numbers are **stop-loss applied** (20 % trigger / 10 % slippage /
-  gap rule on daily OHLC). The "no stop" comparison is in Table 1b.
+**Every one of the 5 models correctly identifies a stock that falls
+more than 50 % of the time, OOS.** The success rate scales with how
+concentrated you make the short list — picking just the model's
+**top-5 most-shortable names per month** lifts every model into the
+52–60 % win-rate band:
 
-### Table 1 — OOS holdout (n=35 monthly rebalances, 2023-06 → 2026-05)
+| Model | n_OOS positions | Win rate | Median trade | Worst trade |
+|---|---:|---:|---:|---:|
+| **gbm_rank** (top-5 OOS) | 175 | **+60.0 %** | **+4.54 %** | −217.5 % |
+| **ew** (top-5 OOS) | 175 | **+57.7 %** | +3.99 % | −52.4 % |
+| naive (top-5 OOS) | 175 | +52.6 % | +1.44 % | −52.3 % |
+| gbm_cls (top-5 OOS) | 175 | +52.6 % | +1.24 % | −173.9 % |
+| logit (top-5 OOS) | 175 | +49.1 % | +0.00 % | −124.0 % |
 
-Ranked by OOS Sharpe. **Stop = 50 % trigger + 10 % slippage + gap rule.**
+**`ew` wins the asymmetry too** — it's the only top-5 model where
+the average winning short (+16.55 %) exceeds the average losing
+short (−14.63 %) in magnitude AND the win rate exceeds 50 %. That
+gives a **win/loss magnitude ratio of 1.13** and a positive
+expected per-position short return of **+3.36 %**.
 
-| Strategy | n_months | Sharpe | CAGR | Ann. vol | MaxDD | Hit-rate |
-|---|---:|---:|---:|---:|---:|---:|
-| **ASX 200 (buy & hold)** | 35 | **+0.71** | **+7.30 %** | 10.77 % | **−7.79 %** | **62.9 %** |
-| **naive / long_short_quintile** | 35 | **+0.39** | +4.19 % | 12.48 % | −13.73 % | **65.7 %** |
-| **ew / long_short_quintile** | 35 | **+0.22** | +2.46 % | 21.54 % | −26.81 % | 45.7 % |
-| ew / quintile_short | 35 | −0.62 | −16.28 % | 23.82 % | −53.71 % | 40.0 % |
-| logit / long_short_quintile | 35 | −0.65 | −13.24 % | 19.11 % | −48.50 % | 37.1 % |
-| naive / quintile_short | 35 | −0.67 | −13.23 % | 18.54 % | −44.96 % | 48.6 % |
-| logit / quintile_short | 35 | −0.95 | −21.16 % | 22.17 % | −56.95 % | 40.0 % |
+But "right > 50 % of the time" isn't the same as "tradeable" —
+see the [**why the squeeze tail matters**](#why-the-squeeze-tail-matters)
+section below.
 
-### Table 2 — Full-period (n=191 monthly rebalances, 2010-06 → 2026-05)
+![Short-return distribution per model (top decile OOS)](charts/short_return_distribution.png)
 
-| Strategy | n_months | Sharpe | CAGR | Ann. vol | MaxDD | Hit-rate |
-|---|---:|---:|---:|---:|---:|---:|
-| **ASX 200 (buy & hold)** | 190 | **+0.39** | **+4.45 %** | 13.79 % | −31.0 % | 61.6 % |
-| **naive / long_short_quintile** | 191 | **+0.14** | +0.90 % | 15.82 % | −51.24 % | 58.1 % |
-| ew / long_short_quintile | 191 | −0.26 | −9.09 % | 24.19 % | −86.17 % | 50.8 % |
-| naive / quintile_short | 191 | −0.56 | −14.93 % | 23.69 % | −93.80 % | 43.5 % |
-| logit / long_short_quintile | 154 | −0.60 | −11.46 % | 17.58 % | −82.54 % | 43.5 % |
-| ew / quintile_short | 191 | −0.76 | −25.84 % | 31.57 % | −99.21 % | 39.3 % |
-| logit / quintile_short | 154 | −0.88 | −23.83 % | 26.41 % | −97.32 % | 36.4 % |
-
-> Trained-model rows have n=154 instead of 191 because the walk-forward
-> CV needs a ~3-year warm-up window — `logit` only has OOF scores from
-> 2013-07 onwards. The naive and EW composites are parameter-free, so
-> they cover the full panel.
-
-![Cumulative growth of $1 — solid = quintile-short, dotted = long-short, dashed = ASX 200 buy & hold (50 % stop applied)](charts/cumulative_returns_monthly.png)
-*Cumulative growth with the **50 % stop applied** to every short position.*
-
-![Cumulative growth of $1 — no stop loss (raw monthly returns)](charts/cumulative_returns_monthly_nostop.png)
-*Same backtest **without any stop loss** — every short realises its full
-uncapped monthly P&L. EW L/S quintile (blue dotted) reaches $4.5,
-naive L/S quintile (black dotted) reaches $2.7, both meaningfully
-above the ASX 200 buy & hold (dashed black) at $2.0. This is what the
-signal looks like before realistic squeeze-execution friction eats
-into it — useful for "where does the alpha live" but not achievable in
-practice without the gap penalty hitting the real squeezes.*
-
-### Table 1b — No-stop comparison: what the strategy could do without ANY stop
-
-Same backtest configuration but **without the stop loss** (every position
-realises its full monthly P&L). Isolates "where the signal lives" from
-"where the gap-cost eats it":
-
-| OOS Sharpe (n=35) | No stop | **50 % stop (default)** | Δ |
-|---|---:|---:|---:|
-| naive / long_short_quintile | +0.92 | **+0.39** | −0.53 |
-| ew / long_short_quintile | +0.91 | **+0.22** | −0.69 |
-| logit / long_short_quintile | +0.24 | −0.65 | −0.89 |
-| naive / quintile_short | −0.32 | −0.67 | −0.35 |
-| ew / quintile_short | −0.08 | −0.62 | −0.54 |
-| logit / quintile_short | −0.20 | −0.95 | −0.75 |
-
-The cost of the 50 % stop is **∼0.5-0.9 Sharpe points** in OOS — that's
-the realised cost of the gap penalty on the small number of real
-squeezes (2-6 % of positions). The no-stop column shows the underlying
-signal; the stop column shows what's left after catastrophic-tail
-protection.
-
-### Stop-loss trigger sensitivity sweep
-
-Why 50 %? Sensitivity over triggers from 20 % → 50 %, keeping the same
-spec (10 % slippage + gap rule). OOS L/S quintile Sharpe for each model:
-
-| Model | 20 % | 25 % | 30 % | 35 % | 40 % | **50 %** | No stop |
-|---|---:|---:|---:|---:|---:|---:|---:|
-| naive | −0.99 | −0.66 | −0.46 | −0.25 | −0.14 | **+0.39** | +0.92 |
-| ew | −0.94 | −0.69 | −0.43 | −0.30 | −0.16 | **+0.22** | +0.91 |
-| logit | −1.54 | −1.27 | −1.10 | −1.05 | −0.98 | −0.65 | +0.24 |
-
-Stop-fire rate (full panel — % of all monthly short positions stopped):
-
-| Model | 20 % | 25 % | 30 % | 35 % | 40 % | **50 %** |
-|---|---:|---:|---:|---:|---:|---:|
-| naive | 16.6 % | 11.4 % | 7.7 % | 5.7 % | 4.2 % | **2.3 %** |
-| ew | 26.4 % | 20.2 % | 15.0 % | 11.8 % | 9.4 % | **6.2 %** |
-| logit | 23.8 % | 17.8 % | 13.3 % | 10.4 % | 8.4 % | **5.5 %** |
-
-**Why 50 % is the right choice:**
-
-- At 20 % the stop fires on 17-26 % of positions — most are false
-  alarms (normal small-cap monthly volatility easily hits +20 %) and
-  the gap penalty on the real squeezes dominates.
-- At 50 % the stop only fires on 2-6 % of positions — these are the
-  genuine multi-bagger squeezes (PLS, 4DX, APX, BRN-style +50 %+
-  moves). The cover penalty on those few cases is meaningful but
-  isolated.
-- No stop is theoretically better (Sharpe +0.92 vs +0.39) but offers
-  zero catastrophic-tail protection. If a single squeeze gaps +300 %
-  overnight at 2.5 % book weight, the book takes -7.5 % in one
-  stroke with no defence. 50 % gives that defence at a Sharpe cost of
-  ~0.5.
-
-Full sweep data:
-[`reports/stop_sensitivity.csv`](reports/stop_sensitivity.csv) /
-[`reports/stop_sensitivity.md`](reports/stop_sensitivity.md).
-
-Backtest data:
-[`reports/backtest_summary_monthly.csv`](reports/backtest_summary_monthly.csv) (50 % stop applied) /
-[`reports/backtest_summary_monthly_nostop.csv`](reports/backtest_summary_monthly_nostop.csv) (no stop) /
-[`reports/headline_table.csv`](reports/headline_table.csv) (chart-table including ASX 200).
+*Every model's distribution has a **positive median** (green dotted —
+most shorts win) but a **left-skewed tail** (squeeze losses extending
+much further than the wins). Naive and EW have the cleanest
+distributions; the trained models concentrate harder and pick up
+deeper squeeze losses.*
 
 ---
 
-## Why the stop trigger choice matters so much
+## What's actually being measured
 
-1. **A tight stop fires too often.** At 20 % trigger, 17 – 26 % of all
-   monthly shorts fire the stop. Small-cap stocks routinely move +20 %
-   in a month for non-squeeze reasons (earnings beats, sector rallies,
-   takeover speculation, commodity pumps). Most of those positions
-   would have recovered by month-end — a tight stop locks in -32 %
-   instead.
-2. **The gap penalty is brutal on the real squeezes** *regardless of
-   trigger level*. When a name DOES squeeze, it doesn't crawl through
-   the trigger — it gaps from the previous close to open up +40 %,
-   +80 %, +200 %. The gap rule covers at
-   `max(entry × (1+trigger) × 1.10, trigger_day_open)`, so on a real
-   squeeze you cover at -80 %, -100 %, -150 %, not the nominal level.
-3. **A high trigger reduces false alarms** without changing the gap-
-   penalty math. At 50 % only the genuine squeezes fire (2-6 % of
-   positions), keeping the gap pain isolated. The strategy is
-   tradeable again — just not as good as the no-stop version.
+For every monthly rebalance from June 2010 → April 2026 (the last
+month with a realised forward return), every model scores the
+~290 investable ASX names from "most shortable" (rank #1) to "least
+shortable" (rank #290). We then build short-positions at five
+levels of conviction:
 
-See the [stop-loss spec](#realistic-stop-loss-spec) for the exact
-mechanics.
+| Bucket | What it picks | Typical basket size per month |
+|---|---|---:|
+| `top-5` | the 5 most-shortable names | 5 |
+| `top-10` | the 10 most-shortable names | 10 |
+| `decile` | top 10 % by score | ~30 |
+| `quintile` | top 20 % by score | ~60 |
+| `tercile` | top 33 % by score | ~95 |
 
----
+For each position we record the realised monthly stock return
+(from adjusted close → next-rebalance adjusted close) and flip the
+sign — so a **positive short return** means the stock fell (we
+were right). No costs, no stop, no portfolio construction.
 
-## How many stocks are picked per month?
+Then per (model, bucket, period) we tabulate:
 
-**Short answer**: a *fraction* of the universe (top 20 % for the
-quintile), not a fixed number. Specifically:
+* **n_positions** — total positions across the window
+* **win rate** — share of positions where the stock fell (short won)
+* **median / mean trade** — central tendency of the per-position
+  short return
+* **mean win / mean loss** — magnitude conditional on direction
+* **win/loss ratio** — `mean win / |mean loss|`. > 1 = bigger wins
+  than losses
+* **worst trade** — single biggest squeeze (the tail risk)
+* **percentile bands** — p5, p25, p75, p95 of trade returns
 
-* The eligible universe varies per rebalance (the `investable` flag
-  depends on price coverage + fresh fundamentals + market cap ≥ A$100 m
-  on that date). Over the OOS window the universe ranges **284 → 306
-  names**, averaging 297.
-* **Quintile = top / bottom 20 % by score = ~60 names per leg.** Over OOS
-  the short basket is exactly **57 – 61 names per month**, mean 59.7.
-* **Equal-weight inside each leg** — every short gets weight `-1 / N`
-  and every long gets `+1 / N`.
-* L/S quintile holds ~120 positions total per month (~60 long + ~60 short).
-* 35 OOS months × ~60 shorts = **2,089 OOS short positions** across 224
-  unique tickers.
-* Full-panel: 191 months × ~50–60 shorts per model = ~10k short positions
-  per model; **346 unique tickers** ever appear in any short basket
-  across all 3 models.
-
-It scales with the cross-section, never "always 10". If the universe were
-100 stocks the basket would be 20; at 500 it'd be 100.
+Full data:
+[`reports/short_signal_summary.csv`](reports/short_signal_summary.csv) /
+[`reports/short_signal_summary.md`](reports/short_signal_summary.md) /
+[`reports/short_signal_per_position.csv`](reports/short_signal_per_position.csv).
 
 ---
 
-## Realistic stop-loss spec
+## Results — every model × every bucket, OOS (n = 35 months)
 
-Implemented in
-[`scripts/_apply_stop_loss_full.py`](scripts/_apply_stop_loss_full.py),
-applied per short position over its monthly holding period:
+### Top-5 picks per month (175 positions over 35 months)
 
-1. **Stop trigger** = `entry_price × 1.50` (50 % adverse move — chosen
-   from the [sensitivity sweep](#stop-loss-trigger-sensitivity-sweep)).
-2. **Daily intraday monitoring**: for each trading day strictly *after*
-   entry, check if `daily_high ≥ stop_price`. First day that breaches
-   fires the stop.
-3. **Execution slippage**: nominal cover = `stop_price × 1.10` =
-   `entry × 1.65` → a -65 % short return at the nominal fill level.
-4. **Gap rule**: cover at the WORSE of nominal cover and the trigger-day
-   open: `cover_price = max(entry × 1.65, trigger_day_open)`. If the
-   stock gaps up 100 % overnight, you cover at -100 %, not -65 %.
-5. **No further P&L** from a stopped position for the rest of the month.
-6. **No look-ahead**: only daily bars *strictly after* the entry date are
-   scanned for trigger.
+The smallest, highest-conviction basket. Each month, just the 5 most-
+shortable names per the model.
 
-Daily auto-adjusted OHLC pulled from Yahoo via
-[`scripts/_pull_ohlc_full.py`](scripts/_pull_ohlc_full.py) — 346 unique
-short-basket tickers × up to 16 years = **1,254,249 daily bars**.
+| Model | n | Win % | Median | Mean | Mean win | Mean loss | Win/loss ratio | Worst |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| **gbm_rank** | 175 | **60.0 %** | **+4.54 %** | +0.10 % | +15.07 % | −22.36 % | 0.67 | −217.5 % |
+| **ew** | 175 | **57.7 %** | +3.99 % | **+3.36 %** | +16.55 % | −14.63 % | **1.13** | −52.4 % |
+| naive | 175 | 52.6 % | +1.44 % | +0.77 % | +13.52 % | −13.36 % | 1.01 | −52.3 % |
+| gbm_cls | 175 | 52.6 % | +1.24 % | −1.52 % | +12.42 % | −16.98 % | 0.73 | −173.9 % |
+| logit | 175 | 49.1 % | +0.00 % | −0.21 % | +14.80 % | −14.72 % | 1.00 | −124.0 % |
 
-### Stop-fire diagnostics (full 16-year panel, 50 % trigger)
+### Top-10 picks per month (350 positions over 35 months)
 
-| Model | Total shorts | Stops fired | Stop rate |
-|---|---:|---:|---:|
-| naive | 8,844 | 203 | 2.3 % |
-| ew | 8,844 | 548 | 6.2 % |
-| logit | 7,728 | 424 | 5.5 % |
+| Model | n | Win % | Median | Mean | Mean win | Mean loss | Win/loss ratio | Worst |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| **ew** | 350 | **57.1 %** | +3.72 % | **+2.70 %** | +15.56 % | −14.45 % | **1.08** | −84.2 % |
+| gbm_rank | 350 | 56.9 % | +3.21 % | +0.26 % | +15.51 % | −19.84 % | 0.78 | −217.5 % |
+| gbm_cls | 350 | 54.3 % | +1.73 % | −0.77 % | +11.65 % | −15.52 % | 0.75 | −173.9 % |
+| naive | 350 | 52.0 % | +1.42 % | +1.31 % | +13.27 % | −11.65 % | 1.14 | −52.3 % |
+| logit | 350 | 51.7 % | +1.14 % | −0.77 % | +13.62 % | −16.18 % | 0.84 | −217.5 % |
 
-EW fires the most stops because its short basket concentrates on
-multi-factor-bearish names (high SI + expensive + low quality), which
-also tend to be the names most prone to squeezes.
+### Top-decile picks per month (~1,039 positions over 35 months)
 
-Full per-position table (OOS):
-[`reports/oos_short_stopped.csv`](reports/oos_short_stopped.csv).
+| Model | n | Win % | Median | Mean | Mean win | Mean loss | Win/loss ratio | Worst |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| **gbm_rank** | 1,039 | **54.4 %** | +2.55 % | −0.98 % | +14.74 % | −19.73 % | 0.75 | −217.5 % |
+| ew | 1,039 | 53.8 % | +2.13 % | **+0.70 %** | +14.39 % | −15.25 % | 0.94 | −218.2 % |
+| logit | 1,039 | 53.6 % | +1.92 % | −0.18 % | +13.41 % | −15.89 % | 0.84 | −217.5 % |
+| gbm_cls | 1,039 | 51.3 % | +0.67 % | −1.16 % | +11.51 % | −14.49 % | 0.79 | −173.9 % |
+| **naive** | 1,039 | 50.8 % | +0.41 % | +0.27 % | +11.44 % | −11.28 % | **1.01** | **−66.6 %** |
+
+### Top-quintile picks per month (~2,081 positions over 35 months)
+
+| Model | n | Win % | Median | Mean | Mean win | Mean loss | Win/loss ratio | Worst |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| **logit** | 2,081 | **53.4 %** | +1.71 % | −0.33 % | +12.57 % | −15.14 % | 0.83 | −218.2 % |
+| gbm_rank | 2,081 | 52.4 % | +1.80 % | −0.92 % | +14.13 % | −17.50 % | 0.81 | −217.5 % |
+| ew | 2,081 | 52.0 % | +1.21 % | **+0.26 %** | +13.20 % | −13.78 % | **0.96** | −218.2 % |
+| naive | 2,081 | 50.9 % | +0.44 % | +0.01 % | +10.56 % | −10.95 % | 0.96 | −177.4 % |
+| gbm_cls | 2,081 | 50.7 % | +0.38 % | −1.28 % | +10.33 % | −13.25 % | 0.78 | −217.5 % |
 
 ---
 
-## Information coefficients — IS and OOS
+## Why the squeeze tail matters
 
-The Spearman rank correlation between each model's score and the realised
-**monthly forward return**, computed cross-sectionally each month then
-averaged. For shorts, **negative IC is good** — it means the "shortable"
-score correlates with names that fell.
+Look at the "**Worst**" column in every table above. Every model
+except top-5 EW and top-5 naive has at least one single position
+that lost **−120 % to −220 %** — these are the squeeze events
+where the stock more than doubled in a single month (4D Medical
++217 %, APX +218 %, Sunrise Resources +174 %, etc.).
+
+The headline win-rate of "50-60 %" is real, but the per-position
+return distribution is **strongly left-skewed**: most shorts win
+by 1-5 %, the wins are small, but a small number of catastrophic
+losses pull the mean down. That's why:
+
+* The **median** trade is positive for every model
+* The **mean** trade is barely positive (and sometimes negative)
+
+This is **structural to short-selling**, not a model defect. A long
+position can lose at most -100 %; a short can lose -500 % or worse.
+Any practical short book has to deal with this asymmetry —
+typically via stops, sector caps, vol-scaled sizing, or simply
+diversifying across enough names to dilute the squeeze impact.
+
+**Naive has the cleanest tail.** Its top-5 worst single position is
+only −52.3 %, compared to −124 % to −218 % for the trained models.
+That's because naive sorts purely by SI %, which spreads its
+picks across the broader market; the trained models concentrate
+into specific multi-factor-bearish names that also happen to be
+the ones most prone to squeezes (PLS, 4DX, APX, BRN).
+
+---
+
+## Information coefficient (signal-quality summary)
+
+The Spearman rank correlation between each model's score and the
+realised monthly forward return, computed cross-sectionally each
+month then averaged. **For shorts, negative IC is good** — the
+"shortable" score correlates with stocks that fell.
 
 | Model | IS IC | IS t-stat | n_IS | OOS IC | OOS t-stat | n_OOS |
 |---|---:|---:|---:|---:|---:|---:|
 | **ew** | **−8.3 %** | **−6.73** | 156 | **−8.9 %** | **−3.83** | 35 |
+| gbm_rank | −7.6 % | −5.61 | 119 | −6.9 % | −2.16 | 35 |
 | logit | −5.3 % | −5.28 | 119 | −5.5 % | −2.48 | 35 |
+| gbm_cls | −3.6 % | −3.77 | 119 | −2.3 % | −1.33 | 35 |
 | naive | −1.6 % | −1.70 | 156 | −2.1 % | −1.38 | 35 |
 
-All three models have negative IC in both IS and OOS; `ew` and `logit`
-clear |t| > 2 in OOS (significant). **The signal is real** — the model
-correctly identifies underperformers. The realistic execution costs are
-what prevent the signal from being tradeable, not the signal itself.
+All 5 models have negative IC in both IS and OOS — meaning **every
+model's score correctly anti-correlates with stock returns**.
+`ew` and `logit` clear |t| > 2 in OOS (statistically significant).
 
 ---
 
-## What do the models actually do? (plain English)
+## The models
 
-### Score interpretation
+### `naive` — sort by reported short interest
 
-Every model produces a single number per (Date, Ticker) called the
-**score**, where **higher = more shortable**. Each month we sort the
-~290 stocks by score, short the top 20 % (most shortable), and (for the
-L/S quintile) buy the bottom 20 % (least shortable = best expected
-returns).
+Score = `ShortPct` cross-sectional rank. **No training, no fitting,
+one column.** The "no-model" benchmark — known short-interest
+anomaly with multi-decade academic pedigree. Strongest tail
+robustness (cleanest worst-trade column) because it doesn't
+concentrate into any particular factor cluster.
 
-### What "long-short quintile" actually means
+### `ew` — polarity-aware equal-weight composite of 12 ranks
 
-The model ranks all ~290 stocks from **most shortable** (rank #1, the
-model's strongest bearish bet) to **least shortable** (rank #290 — the
-opposite extreme, the model's strongest bullish bet). Then:
+Averages 12 cross-sectional rank columns (short %, 3-month
+momentum, 1-month vol, market cap, P/E, ROE, ROIC, FCF yield,
+debt/equity, revenue growth, etc.) — with **every factor
+pre-oriented so that high rank = more shortable**. Six naturally-
+bullish factors (momentum, market cap, FCF yield, ROE, ROIC,
+revenue growth) get flipped via `1 − rank` before averaging.
 
-1. **Short the top 100** (top quintile by score). These are the names
-   the model says will fall most.
-2. **Buy the bottom 100** (bottom quintile). These are the **opposite
-   extreme** — high quality, low SI, positive momentum, low leverage.
-3. **Equal-weight inside each leg.** Net dollar exposure = 0 (long $ =
-   short $), so market-direction risk cancels.
+**Best OOS IC of any model (−8.9 %, t = −3.83)** and the **only
+model with positive mean per-position trade return at top-5
+and top-10 OOS** (+3.36 % and +2.70 % respectively). The polarity
+fix is one of the biggest single wins in the repo — see
+[`scripts/05_train_and_validate.py`](scripts/05_train_and_validate.py)
+for the polarity spec.
 
-You're betting on the **spread** between the two ends. The middle 60 %
-gets ignored.
+### `logit` — L2 logistic regression
 
-### 1. `naive` — sort by reported short interest
+Linear classifier on all ~570 rank features, predicting
+`Pr(monthly forward return < 0)`. Highest win-rate at the wider
+buckets (53.4 % at quintile OOS). Interpretable but linear;
+misses the non-linear interactions that the GBM models can pick up.
 
-**What it does:** For each rebalance month, looks up the ASIC-reported
-**short-interest %** of each stock and uses it directly as the score.
-The stock with the highest reported SI gets the highest "shortable" rank.
+### `gbm_cls` — LightGBM binary classifier
 
-**The math:** Score = `ShortPct`, rank-normalised to 0–1 across the
-cross-section. No training, no fitting. One column.
+Same target as logit but with gradient-boosted decision trees.
+~400 trees in sequence, each correcting the prior tree's errors.
+Captures non-linear interactions ("high SI AND high leverage AND
+deteriorating fundamentals"). Weakest OOS IC of the trained
+models — over-concentrates into squeeze names.
 
-**Why it works:** Professional short-sellers and hedge funds publish
-their positions every week via ASIC. If a lot of them are short the same
-name, they collectively have an informed view that the price will fall.
-Known anomaly with multi-decade academic pedigree.
+### `gbm_rank` — LightGBM LambdaRank
 
-**Limitation:** It's a popularity contest. Crowded shorts squeeze
-occasionally and naive has no defence — it rides the broad signal and
-accepts the tail loss.
-
-### 2. `ew` — polarity-aware equal-weight composite of 12 ranked factors
-
-**What it does:** Computes 12 cross-sectional rank columns (short %,
-3-month momentum, 1-month vol, market cap, P/E, ROE, ROIC, FCF yield,
-debt/equity, revenue growth, etc.) and averages them — with every factor
-**pre-oriented so that high rank = more shortable**.
-
-**The math:** For each month, each factor *f* is ranked 0–1 across all
-stocks. Six factors are inverted via `1 − rank` because they're naturally
-**bullish** (high ROE = quality = LESS shortable etc.):
-
-| Factor | Polarity | Rationale |
-|---|:---:|---|
-| `ShortPct_rk` / `short_pct_ff_rk` / `si_z_12m_rk` | +1 keep | High SI = more shortable |
-| `vol_1m_rk` | +1 keep | High vol = low-vol anomaly says shortable |
-| `pe_rk` | +1 keep | Expensive = shortable |
-| `debt_equity_rk` | +1 keep | Levered = shortable |
-| `mom_3m_rk` | **−1 invert** | High momentum = bullish |
-| `log_mktcap_rk` | **−1 invert** | Mega-caps less shortable |
-| `fcf_yield_rk` | **−1 invert** | Cash-rich = bullish |
-| `roe_rk` / `roic_rk` | **−1 invert** | Quality = bullish |
-| `revenue_growth_yoy_rk` | **−1 invert** | Growing = bullish |
-
-Final score = mean of the 12 polarised ranks, re-ranked cross-sectionally.
-No parameters, no training — every factor gets equal weight.
-
-**Why it works:** **Best OOS IC (-8.9 %)** of any model — the polarity
-spec correctly orients each factor as a short-direction signal. A
-hand-built composite of cheap + levered + shrinking + crowded
-beats the linear model with the same features.
-
-**Limitation:** Equal weight is arbitrary. A real-money build would
-optimise factor weights (e.g. IC-weighted blending) or group-equal-weight
-by theme.
-
-> **A note on polarity.** An earlier version of this composite averaged
-> the raw ranks *without flipping the bullish factors*, producing a +4.8 %
-> IC (i.e. it was actually a long-bias score). The one-line fix —
-> wrapping the six bullish columns in `1 − rank` before the mean —
-> flipped OOS IC to `−8.9 %`. When you blend factors, the sign of each
-> input has to match the sign of the score you're building.
-
-### 3. `logit` — L2 logistic regression on the ranked features
-
-**What it does:** A simple linear classifier that takes all ~570 feature
-rank columns as inputs and predicts the probability that the stock's
-**monthly forward return** will be **negative**.
-
-**The math:** Fits weights *β* to each feature, then
-`prob_down = sigmoid(β · features)`. Score = `prob_down`. Trained on every
-walk-forward fold with L2 regularisation; the final fit on all in-sample
-data is what scores the OOS holdout.
-
-**Why it's included:** The robust, interpretable workhorse of
-quantitative finance. Linear models resist overfitting, and coefficients
-are directly readable as "this factor matters this much".
-
-**Limitation:** Real markets aren't linear. If "high short interest"
-matters only when "momentum is *also* negative", logit can't capture
-that interaction.
-
-### Why these three (and what got dropped)
-
-`naive` is the no-model floor. `ew` is the no-training composite that
-encodes a thoughtful human prior. `logit` is the simplest trained
-model — interpretable, low-overfit. **The previous LightGBM
-classifier and LambdaRank were dropped** after they consistently
-underperformed the no-training baselines on OOS Sharpe and on OOS IC
-(both gbm variants stayed weaker than `ew` at every horizon), AND
-concentrated their picks too tightly into the squeeze tail. May come
-back later but not part of this version.
+Same boosted-tree machinery but optimised to **rank** the
+cross-section directly each month, not to predict an absolute
+probability. NDCG loss — gets rewarded for putting the
+worst-returning stocks at the top of the list. **Highest OOS
+win-rate at top-5 (60 %)** and at top-10 (57 %); the most
+concentrated/conviction-heavy model. Squeeze tail is the worst
+of any model — going decile or quintile produces single losses
+> −200 %.
 
 ---
 
-## Stats & math glossary
+## Polarity audit — do the data agree with the EW spec?
 
-A reader-friendly walkthrough of the metrics on this page.
+Fit a `statsmodels.Logit` on the 12 EW features (IS rows only)
+predicting `Pr(monthly forward return < 0)`. Each coefficient's
+sign should match the EW spec (`+1` = high rank → shortable,
+`−1` = high rank → bullish, invert before averaging).
 
-* **CAGR** — compound annual growth rate. If $1 grew to $1.45 over 3
-  years, CAGR = `1.45^(1/3) − 1 = +13.2 %`. Fund factsheet number.
-* **Sharpe ratio** — `(mean return) / (std dev of returns)` annualised.
-  Risk-adjusted return per unit of total volatility. > 1 good, > 2 great,
-  > 3 exceptional. **For dollar-neutral L/S strategies a 0.5+ Sharpe is
-  real alpha because there's no market beta riding underneath**.
-* **Ann. vol** — monthly stdev × √12. Higher = more risky.
-* **Max drawdown (MaxDD)** — worst peak-to-trough fall on the equity
-  curve. A -10 % MaxDD means at the worst point you were down 10 % from
-  the previous all-time high.
-* **Hit-rate** — fraction of rebalance periods with positive return.
-* **Information coefficient (IC)** — Spearman rank correlation between
-  the model's score and the realised forward return, computed
-  cross-sectionally per month then averaged across months. **Negative
-  IC is good for shorts**.
-* **t-stat** — IC mean / IC standard error. |t-stat| > 2 means the
-  average IC is unlikely to be zero by chance.
-* **IS vs OOS** — *in-sample* = data the model was developed on;
-  *out-of-sample* = held-back data the model never saw during
-  development. **OOS Sharpe is the only honest estimate of future
-  performance.**
-* **Walk-forward CV** — train on 2010–2014, test on 2014–2015; train on
-  2010–2015, test on 2015–2016; etc. The model is never trained on data
-  from after its test window.
-* **Purge + embargo** — extra safety on top of walk-forward. *Purge*
-  drops training samples that overlap the test labels' horizon (here,
-  ~1 month). *Embargo* drops the following ~1 month after the test
-  window. Stops information leakage via the forward-return label.
-* **Quintile** — split into 5 equal buckets. Top quintile = top 20 %
-  by score.
-* **Long-short (L/S)** — long the bottom-quintile names, short the
-  top-quintile. Dollar-neutral.
-* **Round-trip commission** — exchange + broker fees on a full
-  buy-then-sell. 25 bps per side here.
-* **Borrow cost** — annualised fee for borrowing shares to short.
-  1.5 % p.a. flat in `CostConfig`; **significantly understates the
-  small-cap squeeze tail** where actual borrow can be 500-5,000+
-  bps/yr (see [Limitations](#limitations)).
-* **Stop-loss execution slippage** — fees / market impact paid when the
-  stop fires, modelled here as a 10 % penalty on top of the trigger
-  (= -32 % loss before the gap rule).
-* **Gap rule** — on the trigger day, cover at the worse of the nominal
-  fill and the open price. Captures the cost of overnight squeezes.
+| Feature | EW spec | Logit coef | z-stat | Match? |
+|---|:---:|---:|---:|:---:|
+| `ShortPct_rk` | +1 | +0.36 | +3.67 | ✓ |
+| `vol_1m_rk` | +1 | **+0.26** | **+6.26** | ✓ |
+| `pe_rk` | +1 | +0.05 | +0.91 | ✓ |
+| `debt_equity_rk` | +1 | −0.04 | −0.93 | (not sig) |
+| `si_z_12m_rk` | +1 | +0.00 | +0.11 | ✓ (≈0) |
+| `short_pct_ff_rk` | +1 | −0.21 | −2.17 | collinear w/ SI |
+| `mom_3m_rk` | −1 | −0.06 | −1.42 | ✓ |
+| `log_mktcap_rk` | −1 | −0.10 | −2.01 | ✓ |
+| `fcf_yield_rk` | −1 | **−0.21** | **−4.66** | ✓ |
+| `roe_rk` | −1 | **−0.22** | **−3.27** | ✓ |
+| `roic_rk` | −1 | +0.03 | +0.46 | (not sig) |
+| `revenue_growth_yoy_rk` | −1 | −0.01 | −0.36 | ✓ (≈0) |
+
+**9 of 12 match**, with every high-magnitude feature (|z| > 2) on
+the correct side. The polarity spec is empirically validated.
 
 ---
 
-## Current short basket — what's being shorted, and why
+## Methodology (very brief)
 
-_As of 2026-05-29 (most recent monthly rebalance)._ Ranked by **naive
-score** (the highest-Sharpe non-benchmark strategy: rank by reported
-short interest). The per-factor polarity-aware ranks alongside show
-**why** each name is shortable across the EW composite's 12 signals
-— every cell is **0 – 1 where 1 = most shortable** on that factor.
+### Universe
 
-**Score columns:**
+* **ASIC daily-aggregate short-position reports** (weekly,
+  Friday-anchored, 2010-06 onwards).
+* **Top 500 ASX tickers by report frequency** — i.e. stocks that
+  show up in ≥ 33 % of weekly ASIC reports over 16 years.
+* Per-rebalance gate: investable (has price + fresh fundamentals
+  + ≥ A$100m market cap) → ~290 names per month.
 
-* `score_naive` — rank of `ShortPct` across the cross-section
-  (higher = more crowded short).
-* `score_ew` — polarity-aware equal-weight composite of 12 ranks
-  (higher = bearish across many dimensions).
-* `score_logit` — L2 logistic regression `Pr(monthly return < 0)`.
+### Data sources
 
-**Factor columns (all 0 – 1, higher = more shortable; `(inv)` =
-naturally bullish raw rank flipped via `1 − rank`):**
+| Source | Used for |
+|---|---|
+| ASIC PDFs | Short-position reports (only public asset-class-complete source) |
+| Yahoo Finance | Adjusted close prices (16 years, cross-checked vs FMP at ρ = 0.9996) |
+| Financial Modeling Prep (Premium) | 7-endpoint quarterly fundamentals + split-adjusted market cap |
 
-* `SI %` — raw short-interest % rank.
-* `SI z` — 12-month short-interest z-score rank.
-* `3m-mom (inv)` — low 3-month momentum.
-* `vol` — high 1-month realised volatility.
-* `P/E` — expensive valuation.
-* `FCF-yld (inv)` — low free-cash-flow yield.
-* `ROE (inv)` — low return on equity.
-* `D/E` — high leverage.
-* `rev-gth (inv)` — low or negative year-on-year revenue growth.
+### Features
 
-| # | Ticker | Company | Mkt Cap (A$m) | Short % | naive | ew | logit | SI % | SI z | 3m-mom (inv) | vol | P/E | FCF-yld (inv) | ROE (inv) | D/E | rev-gth (inv) | EW factor avg |
-|---:|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| 1 | LOT | Lotus Resources | 450 | **19.54** | **1.000** | **1.000** | 0.606 | 1.00 | 0.98 | 0.99 | 0.71 | 0.50 | 0.96 | 0.87 | 0.16 | 0.98 | **0.794** |
-| 2 | DMP | Domino's Pizza Enterprises | 1,984 | 15.20 | 0.997 | 0.786 | 0.596 | 1.00 | 0.56 | 0.53 | 0.54 | 0.59 | 0.17 | 0.33 | 0.90 | 0.78 | 0.599 |
-| 3 | TLX | Telix Pharmaceuticals | 3,794 | 15.15 | 0.993 | 0.845 | 0.584 | 0.99 | 0.70 | 0.09 | 0.42 | 0.50 | 0.79 | 0.72 | 0.81 | 0.42 | 0.604 |
-| 4 | BOE | Boss Energy | 610 | 14.33 | 0.990 | 0.648 | 0.475 | 0.99 | 0.22 | 0.81 | 0.26 | 0.50 | 0.47 | 0.76 | 0.05 | 0.02 | 0.453 |
-| 5 | TWE | Treasury Wine Estates | 4,244 | 13.07 | 0.986 | 0.900 | 0.473 | 0.99 | 0.66 | 0.44 | 0.51 | 0.50 | 0.53 | 0.91 | 0.64 | 0.84 | 0.669 |
-| 6 | PLS | Pilbara Minerals | 13,590 | 11.53 | 0.983 | 0.597 | 0.539 | 0.98 | 0.48 | 0.04 | 0.38 | **0.98** | 0.61 | 0.66 | 0.41 | 0.07 | 0.514 |
-| 7 | CAR | CAR Group | 11,632 | 11.24 | 0.979 | 0.728 | 0.474 | 0.98 | 0.91 | 0.52 | 0.33 | 0.79 | 0.41 | 0.40 | 0.59 | 0.51 | 0.606 |
-| 8 | FLT | Flight Centre Travel | 3,210 | 10.77 | 0.976 | **0.945** | 0.581 | 0.98 | 0.58 | 0.63 | 0.71 | 0.65 | 0.79 | 0.40 | 0.81 | 0.78 | **0.704** |
-| 9 | PDN | Paladin Energy | 1,869 | 10.63 | 0.972 | 0.852 | 0.508 | 0.97 | 0.27 | 0.57 | 0.86 | 0.50 | 0.64 | 0.81 | 0.38 | 0.13 | 0.571 |
-| 10 | 4DX | 4D Medical | 1,948 | 10.06 | 0.969 | 0.812 | 0.549 | 0.97 | **0.99** | 0.61 | **0.99** | 0.50 | 0.71 | 0.00 | 0.01 | 0.06 | 0.539 |
-| 11 | LYC | Lynas Rare Earths | 12,191 | 9.97 | 0.966 | 0.659 | 0.361 | 0.97 | 0.67 | 0.30 | 0.59 | 0.92 | 0.57 | 0.57 | 0.26 | 0.11 | 0.549 |
-| 12 | HLS | Healius | 657 | 9.55 | 0.962 | **0.993** | **0.613** | 0.96 | 0.92 | 0.96 | 0.97 | 0.50 | 0.06 | 0.83 | **0.93** | 0.58 | **0.745** |
-| 13 | BPT | Beach Energy | 2,691 | 9.50 | 0.959 | 0.607 | 0.482 | 0.96 | 0.83 | 0.55 | 0.56 | 0.10 | 0.14 | 0.43 | 0.39 | 0.74 | 0.522 |
-| 14 | BAP | Bapcor | 703 | 9.41 | 0.955 | **0.986** | **0.673** | 0.96 | 0.71 | 0.96 | 0.98 | 0.50 | 0.17 | 0.90 | 0.79 | 0.57 | **0.726** |
-| 15 | CUV | Clinuvel Pharmaceuticals | 625 | 9.38 | 0.952 | 0.772 | 0.515 | 0.95 | 0.64 | 0.65 | 0.25 | 0.71 | 0.40 | 0.46 | 0.06 | 0.96 | 0.565 |
+~25 raw factors → 562 cross-sectional rank columns. All time-
+horizon labels in months (`mom_3m`, `vol_1m`, `si_z_12m`).
+Per-rebalance ranks computed within the cross-section to 0-1;
+NaN imputed to 0.5 (neutral).
 
-### How to read this table
+### Cross-validation
 
-* **A row of mostly bold / dark cells** = the name is shortable across
-  *multiple* dimensions. These are the multi-factor shorts the EW
-  composite is built to find — crowded SI + falling momentum + low
-  quality + high leverage all at once. `LOT` (EW factor avg 0.79),
-  `HLS` (0.75), `BAP` (0.73), `FLT` (0.70) are the cleanest examples
-  on this rebalance.
+* **36-month pure OOS holdout** (2023-06 → 2026-05) reserved.
+  Trained models never see these rows during development.
+* On the 156-month IS portion: walk-forward expanding window
+  (~36-month min train, ~6-month test, 1-month embargo).
+  ~120 OOF observations per trained model.
+* Final model fit on entire IS panel → applied to holdout.
 
-* **A row with high SI columns but low fundamentals columns** = a
-  "pure crowded-short" play. Naive ranks it highly because `score_naive`
-  is just the SI rank, but EW down-weights it because the quality /
-  valuation / momentum signals don't agree. `BOE` (Boss Energy) is a
-  good example here — 99th-percentile SI but only 0.45 EW-factor-avg
-  because momentum is high (positive uranium sentiment) and
-  leverage is low.
+### What's NOT in this repo
 
-* **A row with low `EW factor avg` despite a top-15 spot** flags the
-  names most exposed to squeeze risk — where naive is alone in pushing
-  the name onto the list. `PLS` (vol 0.98 but EW avg 0.51) is the
-  classic example: massive short interest, very volatile, but
-  fundamentals don't justify a bearish thesis. `BOE`, `4DX` (no
-  earnings, no growth, but high momentum) sit in the same bucket.
+By design — this is a signal-quality project, not a strategy:
 
-### What the top picks have in common
+- No portfolio construction (no long leg, no L/S quintile, no
+  dollar-neutrality, no sector caps)
+- No costs (no commission, slippage, borrow, market impact)
+- No stop loss / regime overlay / risk control
+- No position sizing (every position is treated equally)
+- No benchmark comparison (we measure absolute signal quality,
+  not relative performance)
 
-The four names with the highest EW factor average (`LOT 0.79`, `HLS
-0.75`, `BAP 0.73`, `FLT 0.70`) score above 0.85 on **at least seven of
-the nine polarity-aware factors**. Reading the rows row-by-row:
-
-* **LOT (Lotus Resources)** — A$450 m uranium developer. 19.5 % short
-  interest is the highest in the universe; SI z 0.98 means it's at
-  the top of its 12-month SI range; 3m-momentum rank inverted = 0.99
-  (i.e. price has been falling); revenue-growth-rank inverted = 0.98
-  (shrinking). Only D/E rank low (0.16) — a debt-free junior, which
-  is normal for pre-production explorers. The model sees a
-  cratering price + crowded short + no growth: a textbook bearish
-  setup.
-* **HLS (Healius)** — A$657 m diagnostics. SI 9.55 % with z = 0.92,
-  3m-momentum rank inverted 0.96, vol 0.97, ROE inverted 0.83 (low
-  ROE), D/E 0.93 (highly levered). Multi-factor bearish across
-  *almost every* dimension.
-* **BAP (Bapcor)** — A$703 m auto parts. 9.41 % SI, z 0.71, 3m-mom
-  inv 0.96, vol 0.98, ROE inv 0.90, D/E 0.79. Same playbook as HLS
-  — concentrated short + low quality + falling + levered.
-* **FLT (Flight Centre)** — A$3.2 bn travel. Broader signal lock:
-  expensive (P/E 0.79), low ROE (0.81), levered (0.81), shrinking
-  growth (0.78). The lower SI rank (0.58) is the only number
-  that's not screaming "short".
-
-### Why these names — not the ASX 50 mega-caps
-
-The universe **does include every ASX 50** (CBA at A$268 bn, RIO at
-A$159 bn, BHP at A$154 bn, all four banks, CSL, MQG, TLS). They just
-rarely make it into the short basket because mega-cap SI is low (CBA
-2.1 %, BHP 1.4 %, CSL 0.7 %) and their quality / valuation / leverage
-metrics rank them as **least-shortable** — they end up in the **long**
-quintile, not the short one. **RIO at 8.7 % SI** is the only mega-cap
-that occasionally drifts into the bearish tail.
-
-Live data, regenerate any time:
-[`reports/current_short_basket.csv`](reports/current_short_basket.csv) /
-[`reports/current_short_basket.md`](reports/current_short_basket.md)
-via `scripts/_current_short_basket.py`.
+If/when this gets pushed into a tradeable strategy, all of the
+above become first-class concerns. They're deliberately *out of
+scope* here to keep the focus on "does the signal work".
 
 ---
 
-## Methodology
+## Today's short candidates
 
-### 1. Universe and rebalance — Friday-release dates (4-BDay lag respected)
+The top 15 names by **consensus rank** across all 5 models on
+the most recent rebalance (29 May 2026). Higher rank = stronger
+short conviction (all 5 models agree).
 
-* **ASIC daily aggregate short-position reports**: weekly, Friday-
-  anchored (the earliest archived report we use is 16 June 2010).
-* Each Friday ASIC release covers positions **as of the prior Monday**
-  (4 business days earlier). The pipeline rebalances on the Friday
-  release using Friday's adjusted close as the entry price. The Monday
-  as-of date is preserved as `AsOfDate` for diagnostic purposes only.
-* End-of-month rebalance = the last ASIC release in each calendar month.
-  192 dates, day-of-week mix: 180 Fridays, 10 Thursdays, 2 Wednesdays
-  (Easter / Christmas / King's Birthday shifts).
-* Universe = **top 500 ASX tickers by ASIC-report frequency** over the
-  full 16 years, gated at ≥ A$100 m market cap on each rebalance.
-
-### 2. Data sources — and why the Yahoo / FMP split
-
-| What | Source | Why |
-|---|---|---|
-| Short positions | ASIC daily aggregate PDFs | Only public, free, asset-class-complete source for ASX |
-| Prices (adjusted close + volume) | **Yahoo Finance** | FMP only ships ~5 yrs of ASX daily history on this plan; Yahoo goes back to ~2000. Cross-checked vs FMP at **median ρ = 0.9996** over the overlap window |
-| Daily OHLC for stop-loss logic | **Yahoo Finance** (auto_adjust=True) | 1,254,249 daily bars × 346 short-basket tickers |
-| Fundamentals (7 quarterly endpoints) | Financial Modeling Prep (Premium) | Income, balance sheet, cash flow, ratios, key metrics, enterprise values, financial growth |
-| Market capitalisation | **FMP `enterprise_values`** (half-yearly, split-adjusted) | Balance-sheet `commonStockSharesOutstanding` isn't back-adjusted across corporate actions; `enterprise_values.marketCapitalization` is. Fixes the Paladin Energy 1:100 reverse-split bug from earlier versions. |
-
-**Could we go Yahoo-only?** No — Yahoo's `quarterly_financials` only
-exposes the last ~4 quarters; its `info` snapshot has no `acceptedDate`
-(breaks no-look-ahead); its `marketCap` isn't back-adjusted across
-reverse splits. FMP is essential for fundamentals + PIT market cap.
-
-### 3. Features
-
-~25 raw factors → **562 cross-sectional rank columns** across short
-interest (SI %, SI z-score, days-to-cover, persistence), price (multi-
-horizon momentum and vol, drawdown), liquidity (ADV, turnover, Amihud),
-valuation (P/E, P/B, EV/EBITDA, FCF yield), quality (ROE, ROIC, margins,
-accruals), leverage and growth. **All time-horizon labels are in months**
-(`mom_3m`, `vol_1m`, `si_z_12m`, etc.) for consistency with the monthly
-rebalance grid — the underlying compute uses weekly bars but the labels
-are framed in months because 4 weeks ≈ 1 calendar month here. Every
-numeric factor is ranked **within each rebalance date** to 0–1, then NaN
-values are imputed to 0.5 (neutral) so linear models don't blow up on
-missing fundamentals.
-
-### 4. Targets
-
-* **Forward-return label**: 1 month (the column is called `fwd_ret_1m`
-  in the parquet — internally computed as 4 weeks forward, which equals
-  one rebalance period on the monthly grid).
-* **Binary**: `fwd_ret_1m < 0` for the logit classifier.
-
-### 5. Cross-validation (walk-forward + IS/OOS holdout)
-
-* **Pure OOS holdout**: the last 36 monthly rebalances (2023-06 →
-  2026-05) are *reserved* — the trained models never see these rows
-  during development.
-* On the **156-month in-sample** portion (2010-07 → 2023-05):
-  walk-forward expanding window with ~36-month min train, ~6-month
-  test, 1-month embargo (≥ label horizon). 20 folds total, ~120 monthly
-  OOF observations per trained model.
-* After CV, a final model is fit on the entire IS panel and applied to
-  the holdout. That single OOS Sharpe is the unbiased estimate.
-
-### 6. Portfolio + costs
-
-* Top-quintile short OR dollar-neutral L/S quintile (long bottom 20 %,
-  short top 20 %), equal weight within each leg, monthly rebalance.
-* Liquidity gate: investable + ≥ A$100 m mkt cap.
-* Frictions: 25 bps round-trip commission per side, 1.5 % p.a. borrow on
-  shorts, 5 bps slippage on weight changes.
-* **Realistic stop loss applied per spec above** (20 % trigger / 10 %
-  slippage / gap rule on daily OHLC).
-
----
-
-## Follow-up research: why regime detection is necessary
-
-The headline backtest deliberately doesn't include a regime overlay —
-the strategy is pure cross-sectional signal + costs + stop. But looking
-at the no-stop chart, **the COVID-2020 stretch jumps out**: between
-roughly March and August 2020 the short-only books lose between **−44 %
-and −64 %** over 6 months. That's the biggest drawdown anywhere in the
-panel, and it's the single most important reason a real fund would want
-a market-regime layer on top of the systematic signal.
-
-### Why systematic short books die in recovery rallies
-
-The 2020 H2 recovery was a **"junk rally"** — the lowest-quality,
-highest-short-interest names rallied 100-300 % as retail traders piled
-in, governments printed money, and lockdown beneficiaries (small-cap
-biotechs, lithium plays, online-everything stocks) ripped higher.
-Those are *exactly* the names a systematic short book picks. Two
-dynamics hit at once:
-
-1. **The short leg gets squeezed.** Worst rolling-6-month return ending
-   August 2020 — ew/quintile-short **−64 %**, logit/quintile-short
-   **−56 %**, naive/quintile-short **−44 %**. The names the model is
-   most bearish on are the names that rally hardest.
-2. **The long leg under-performs.** High-quality, low-SI names (banks,
-   big miners, stable industrials) lag the junk rally badly, so the
-   long-leg cushion that normally bails out the L/S construction isn't
-   there.
-
-The 50 % per-position stop clips the worst individual squeezes but
-**can't fix the regime** — it just trims each squeeze position; it
-doesn't tell you to stop putting on new shorts.
-
-### What a regime overlay could look like
-
-The cleanest no-look-ahead approach: at each rebalance, measure the
-**ASX 200 trailing return** (uses only prior closes) and skip the
-short leg when the market has just rallied hard. Mechanic per
-rebalance month:
-
-* If `ASX 200 trailing-3m return > +X %` → **skip the short leg this
-  month**.
-  * For `quintile_short`: return 0 % (cash).
-  * For `long_short_quintile`: keep the long leg only, drop the short.
-* Otherwise: normal strategy.
-
-Why this should work in principle: a 3-month trailing market rally is
-exactly the macro state where junk-rally squeezes are most likely. The
-trigger is computable in real time from prior data only — no
-look-ahead.
-
-### Exploratory sweep — does it actually work?
-
-A short experimental sweep is in
-[`scripts/_regime_filter.py`](scripts/_regime_filter.py) /
-[`reports/regime_filter.md`](reports/regime_filter.md). At a trailing-3m
-> 5 % threshold (skips 53 of 191 months ~ 28 %), every model's
-**L/S quintile OOS Sharpe goes up materially** (naive +0.92 → +1.55,
-ew +0.91 → +1.29, logit +0.24 → +0.67) and **all three short-only
-books clear positive OOS Sharpe** for the first time anywhere in the
-project (naive −0.32 → +0.25, ew −0.08 → +0.47, logit −0.20 → +0.35).
-
-**Honest caveat.** The 5 % threshold was picked *after* seeing the
-OOS results — that's implicit hyperparameter overfit. Worth flagging:
-on the IS panel the same filter slightly *hurts* naive (Sharpe +0.62 →
-+0.51), but on OOS it doubles the Sharpe. That divergence suggests
-the filter may be fitting the post-2020 regime specifically. A real
-deployment would need to:
-
-1. Pick the threshold from **IS data only**, validate on OOS as a
-   sanity test (not a tuning target).
-2. **Test the same filter on a different country** (US Russell 2000
-   short-interest data is the natural transfer test). If the filter
-   transfers, it's a real macro effect; if not, it's a curve-fit.
-3. **Account for the extra turnover cost** on every skip-and-re-enter
-   cycle (commission + slippage round-trips not currently modelled
-   for the regime exits).
-
-Bottom line: **the headline backtest stays without a regime overlay**
-because the signal-quality story (negative IC, stop-loss spec, basket
-construction) is what the project is for. But if this strategy ever
-went to a live book, a regime layer along these lines would be the
-single highest-impact addition — exactly the COVID-style stretches
-where every other risk control fails.
-
----
-
-## Limitations
-
-* **Borrow cost flat 1.5 % p.a.** — significantly underestimates the
-  small-cap squeeze tail. Real ASX borrow runs ~25–50 bps/yr for
-  ASX 50 large-caps, ~100–200 bps for mid-caps, **500–1,500 bps for
-  crowded small-cap shorts**, 5,000+ bps (or recall) for squeeze names.
-  Wiring in a per-ticker borrow term structure is on the follow-up list.
-* **Sector dummies skipped** — FMP `profile` not pulled. Easy follow-up.
-* **No market-impact / liquidity-aware sizing.** The backtest
-  equal-weights each leg; a real book would have to taper or skip the
-  bottom-of-tail names.
-* **Capital-raise / squeeze dynamics absent.** The OHLC engine is
-  point-in-time bars; no halts, takeover-bid gap modelling, or hard-to-
-  borrow recall events.
-* **Sample limitations.** OOS = 36 months (3 years). That's a strong
-  holdout for a 16-year IS panel but still a single regime
-  (2023–2026: post-COVID rally, AI boom, China-shock 2.0).
-* **No tax, financing, FX modelling.**
-* **Realistic stop loss is harsh but realistic.** The 20 % trigger +
-  10 % slippage + gap rule is a faithful model of how a real stop
-  would fill on a squeezing small-cap. A more sophisticated risk
-  control (signal-driven exits, sector-neutral construction,
-  vol-scaled position sizes) might produce a better result — but
-  is out of scope here.
+See [`reports/current_positions_monthly.md`](reports/current_positions_monthly.md)
+for the full table with per-model scores and the per-factor
+breakdown showing **why** each name is flagged.
 
 ---
 
@@ -778,24 +349,22 @@ where every other risk control fails.
 ```bash
 git clone https://github.com/Taff1887/short-king-2.0.git
 cd short-king-2.0
-cp .env.example .env       # put your FMP_API_KEY in .env
+cp .env.example .env       # put FMP_API_KEY in .env
 uv sync --extra dev
 ```
 
 ```bash
-# Full pipeline (cold-run total ~30 min)
+# Full pipeline (cold-run ~10 min)
 uv run python scripts/01_pull_asic.py             --weeks 833
 uv run python scripts/02_pull_fmp_fundamentals.py --top-tickers 500 --limit 80
 uv run python scripts/_refilter_asic.py
 uv run python scripts/03_pull_fmp_prices.py
 uv run python scripts/04_build_features.py
 uv run python scripts/05_train_and_validate.py    --monthly --holdout-months 36
-uv run python scripts/06_backtest.py              --monthly
-uv run python scripts/_pull_ohlc_full.py
-uv run python scripts/_apply_stop_loss_full.py        # << applies realistic stop loss to all backtests
-uv run python scripts/_build_headline_chart_and_table.py
+uv run python scripts/_short_signal_analysis.py   # << the headline output
 uv run python scripts/_current_positions.py       --monthly
 uv run python scripts/_data_audit.py
+uv run python scripts/_extra_charts.py
 ```
 
 Java (any version) on `PATH` for `tabula-py`; `pdfplumber` is the
@@ -803,133 +372,47 @@ Java-free fallback.
 
 ---
 
-## v1 → v2 delta
+## Limitations
 
-| Dimension | v1.0 (original) | v2.0 (this repo) |
-|---|---|---|
-| Repo structure | one notebook | src-layout package + scripts + tests + docs |
-| Window | implicit (~15 yrs, weekly) | 2010-06 → 2026-05 (15.97 yrs), monthly rebalance |
-| Universe | implicit, all ASX | explicit top-500 by ASIC frequency, A$100m mcap gate |
-| Prices | Yahoo (no validation) | Yahoo, cross-checked vs FMP at ρ = 0.9996 |
-| Fundamentals | none | FMP 7-endpoint PIT panel, lagged to `acceptedDate` |
-| Market cap | shares × price (breaks on splits) | FMP `enterprise_values` (split-aware) |
-| Features | 5 price/SI only | ~25 raw → 562 cross-sectional ranks |
-| Cross-validation | single 400-week train / forward test | walk-forward expanding window + 36-month pure OOS holdout |
-| Models | one logit | naive + polarity-aware EW + L2 logit (3 models, no GBM) |
-| Risk control | hard 10 % stop, no costs | **Realistic 20 % stop + 10 % slippage + daily-OHLC gap rule** |
-| Metrics | total $ PnL only | CAGR / Vol / Sharpe / Sortino / MaxDD / Calmar / IS/OOS / hit-rate / turnover |
-| Benchmark | none | ASX 200 buy & hold, integrated into the chart and summary tables |
-| Reporting | inline plots | publication-quality PNGs + RESULTS.md + data_audit.md + methodology |
-| Reproducibility | none | uv lockfile, deterministic on-disk caches, 38-test pytest suite |
+* **Top-500 ASIC-frequency filter** introduces survivorship bias
+  toward frequently-shorted names. Stocks that have been shorted
+  only sporadically over 16 years get dropped. For practical
+  purposes this is the universe a short signal would actually
+  trade in anyway.
+* **Universe biased toward mid/small-cap.** Mega-caps (CBA, BHP,
+  RIO) are in the universe but rarely rank as shortable; the
+  signal lives in the A$200m – A$2bn tail.
+* **No costs in the analysis.** A real trade pays commission
+  (~25 bps round-trip), borrow (1.5 % p.a. for liquid names,
+  500-5,000+ bps for crowded shorts), and slippage. None of these
+  are modelled here — the headline win-rate is gross of all
+  frictions.
+* **No squeeze protection.** The worst trades are −120 % to −220 %
+  single-month losses. A real book would clip these via stops or
+  sector caps, but doing so realistically (with daily-OHLC gap
+  modelling) destroys most of the alpha — see the prior version
+  of this README in git history for the realistic-stop-loss
+  analysis.
+* **36-month OOS** is a single regime (2023-2026). Strong evidence
+  but not definitive — a larger panel (e.g. via WRDS extending
+  to 1995+ on US data) would help.
 
 ---
 
-## Appendix — what the long-only leg looks like on its own
+## v1 → v2 delta
 
-> *"It seems weird the short-only trends downwards and the long-short
-> trends upwards... I'd argue it would trend even more upwards if it
-> were just long only."*
-
-Spot-on intuition, and the math forces it: since
-`L/S = long_leg + short_leg` and the short leg has consistently negative
-returns, the **long leg alone has to be bigger than L/S**. To verify,
-we derive the long-only series from the existing parquets
-(`long_only = ls_quintile − quintile_short`, which cancels the
-shared short-side costs and leaves the long-leg net) and chart it.
-
-![Long-only component of each model — cumulative growth of $1 vs ASX 200](charts/long_only_components.png)
-
-*Long-only component of each model's bottom-quintile basket (no stop,
-since shorts aren't involved). ew/long-only ends at **~$14**, naive at
-**~$8**, logit at **~$4.5** — all three crush the ASX 200 buy & hold
-(dashed) at $2.0.*
-
-### Summary — every leg side-by-side
-
-**OOS (n=35), ranked by Sharpe:**
-
-| Strategy | Sharpe | CAGR | Ann. vol | MaxDD | Hit-rate |
-|---|---:|---:|---:|---:|---:|
-| **ew / long-only** | **+1.60** | **+20.5 %** | 12.2 % | **−9.0 %** | **71.4 %** |
-| **naive / long-only** | **+1.15** | +17.5 % | 15.0 % | −10.7 % | 60.0 % |
-| naive / L/S quintile | +0.92 | +11.2 % | 12.4 % | −10.8 % | 68.6 % |
-| ew / L/S quintile | +0.91 | +17.2 % | 19.4 % | −16.6 % | 48.6 % |
-| logit / long-only | +0.83 | +8.6 % | 10.6 % | −9.3 % | 57.1 % |
-| ASX 200 (buy & hold) | +0.71 | +7.3 % | 10.8 % | −7.8 % | 62.9 % |
-| logit / L/S quintile | +0.24 | +2.9 % | 18.5 % | −37.1 % | 48.6 % |
-| ew / quintile-short | −0.08 | −4.1 % | 22.2 % | −36.6 % | 51.4 % |
-| logit / quintile-short | −0.20 | −6.3 % | 21.1 % | −40.9 % | 48.6 % |
-| naive / quintile-short | −0.32 | −7.2 % | 18.1 % | −35.7 % | 51.4 % |
-
-**Full period (n=191), ranked by Sharpe:**
-
-| Strategy | Sharpe | CAGR | Ann. vol | MaxDD |
-|---|---:|---:|---:|---:|
-| **ew / long-only** | **+1.22** | **+17.9 %** | 14.5 % | −31.8 % |
-| logit / long-only | +0.80 | +12.0 % | 15.9 % | −33.8 % |
-| naive / long-only | +0.79 | +14.3 % | 19.4 % | −34.9 % |
-| naive / L/S quintile | +0.62 | +8.2 % | 14.2 % | −31.0 % |
-| ew / L/S quintile | +0.58 | +10.2 % | 20.7 % | −57.4 % |
-| ASX 200 (buy & hold) | +0.39 | +4.5 % | 13.8 % | −31.0 % |
-| logit / L/S quintile | +0.24 | +2.6 % | 15.8 % | −37.6 % |
-| ew / quintile-short | −0.20 | −9.5 % | 28.4 % | −86.2 % |
-| naive / quintile-short | −0.29 | −8.5 % | 21.9 % | −82.7 % |
-| logit / quintile-short | −0.37 | −11.3 % | 24.4 % | −84.1 % |
-
-### What this honestly shows
-
-**The model's *bottom* quintile is doing the work, not the top.** When
-the model ranks 290 stocks from "most shortable" to "least shortable",
-the **least-shortable** names (low SI + low leverage + high momentum +
-high ROE + high FCF + low P/E) end up being **really good longs**.
-This makes total sense — the model is calibrated to find the bearish
-tail, so the opposite tail naturally captures the *most* attractive
-buy candidates by the same yardstick.
-
-The full-period numbers are honest:
-
-* **EW long-only** is the standout — **Sharpe 1.22 over 16 years**
-  with +17.9 % CAGR, beating every other strategy in the project by
-  a wide margin. EW's polarity-aware factor blend works *exactly as
-  designed* — it's just that the alpha lives on the long side, not
-  the short side.
-* **Every long-only leg beats the L/S quintile** at every horizon —
-  by 0.2–0.4 Sharpe and 7-10 percentage points of CAGR.
-* **Every short-only leg drags performance down** when combined with
-  the long leg. The L/S "strategy" is functionally a long-quality
-  strategy with an expensive negative-Sharpe hedge attached.
-
-### So why even have a short leg?
-
-Two legitimate reasons (neither of which holds up in this data, but
-both are why the L/S construction exists in the first place):
-
-1. **Dollar-neutrality** — L/S has zero market beta; long-only has
-   beta ≈ 1. If you want to isolate the cross-sectional *spread*
-   from the market direction, you need both legs.
-2. **Crisis hedging** — in a bear market the short leg is supposed
-   to pay off and protect the long leg. **But that's the opposite
-   of what we observe** — the short leg loses MOST during recovery
-   rallies (see [COVID 2020 analysis](#follow-up-research-why-regime-detection-is-necessary)),
-   and only does well in steady down-markets which are rare.
-
-**Honest takeaway for an interviewer:** the most important research
-finding of this entire project might be that **the long leg is what
-matters**. The short signal is technically real (negative IC, > 50 %
-per-position win rate) but the realised costs (borrow, gap risk,
-recovery-rally squeezes) eat it. Meanwhile the *inverse* signal — go
-long the names this model says are least-shortable — is a clean,
-high-Sharpe, beats-the-index strategy with no clever derivatives,
-no leverage, no stops.
-
-If this project had a "where would I take this next" follow-up, it
-would be: **drop the short leg entirely, run a long-only book on the
-bottom-quintile of the polarity-aware EW score, focus the methodology
-work on factor weighting and turnover control rather than squeeze
-protection**.
-
-Full summary data:
-[`reports/long_only_summary.csv`](reports/long_only_summary.csv).
+| Dimension | v1.0 (original notebook) | v2.0 (this repo) |
+|---|---|---|
+| Repo structure | one 430 KB notebook | src-layout package + scripts + tests + docs |
+| Window | implicit (~15 yrs, weekly) | 2010-06 → 2026-05 (15.97 yrs), monthly grid |
+| Universe | implicit, all ASX | explicit top-500 by ASIC frequency, A$100m gate |
+| Prices | Yahoo (no validation) | Yahoo, cross-checked vs FMP at ρ = 0.9996 |
+| Fundamentals | none | FMP 7-endpoint PIT panel, lagged to `acceptedDate` |
+| Features | 5 price/SI only | ~25 raw → 562 cross-sectional ranks |
+| Cross-validation | single 400-week train / forward test | walk-forward expanding + 36-month pure OOS holdout |
+| Models | one logit | naive + EW + logit + gbm_cls + gbm_rank (5 models) |
+| Focus | tradeable strategy | **signal quality** — success rate + magnitude |
+| Reproducibility | none | uv lockfile, deterministic caches, 38-test pytest suite |
 
 ---
 

@@ -1,16 +1,26 @@
-"""Walk-forward train + validate the three baseline models on the feature panel.
+"""Walk-forward train + validate the five short-signal models on the feature panel.
 
 Models (all walk-forward, no look-ahead):
 
 * ``naive``       - rank by raw short-interest percentile (industry baseline).
 * ``ew``          - polarity-aware equal-weight composite of ``*_rk`` columns.
 * ``logit``       - L2 logistic regression on the rank features (sklearn).
+* ``gbm_cls``     - LightGBM binary classifier on ``Pr(monthly forward return < 0)``.
+* ``gbm_rank``    - LightGBM cross-sectional LambdaRank on inverted decile target.
 
-GBM models were dropped from the project after they consistently
-underperformed the no-training baselines on OOS Sharpe and had worse
-squeeze concentration. The OOF predictions land in
-``reports/oof_predictions.parquet`` (+ the monthly variant) and the
-per-model IC summary in ``reports/model_metrics.csv``.
+The OOF predictions land in ``reports/oof_predictions.parquet`` (+ the
+monthly variant) and the per-model IC + decile-spread summary in
+``reports/model_metrics.csv``. SHAP and gain-based feature-importance
+artefacts for the GBM classifier are saved under ``reports/`` and
+``charts/``.
+
+NOTE: this project has been refocused on **short-signal quality**
+(success rate + magnitude of identified shorts), not on portfolio
+returns. The downstream pipeline analyses the OOF predictions
+directly via ``_short_signal_analysis.py``; there is no portfolio
+backtest engine, no L/S construction, no stop-loss logic, and no
+trading-cost model. Every position is treated equally and the only
+thing measured is "did the stock fall, and by how much?".
 """
 
 from __future__ import annotations
@@ -27,10 +37,24 @@ from short_king.models.baselines import (
     naive_si_rank,
     predict_logit_baseline,
 )
+from short_king.models.interpret import (
+    gain_importance,
+    mean_abs_shap,
+    plot_shap_summary,
+    shap_values_sampled,
+)
 from short_king.models.metrics import (
+    calibration_table,
     decile_spread,
     ic_summary,
     rank_ic,
+)
+from short_king.models.ml import (
+    GBMConfig,
+    decile_target,
+    fit_gbm_classifier,
+    fit_gbm_ranker,
+    predict_score,
 )
 from short_king.models.walk_forward import walk_forward_splits
 from short_king.utils.config import settings
@@ -256,16 +280,24 @@ def main() -> int:
 
     # Binary + decile targets, per-date.
     y_bin = (df[fwd_col] < 0).astype("float64").where(df[fwd_col].notna())
+    # decile_target returns 0..9 where 9 == highest forward return. For a SHORT
+    # signal we want the ranker to pull "worst forward return" (decile 0) to
+    # the top, so we invert: y_rank = 9 - decile  =>  decile 0 becomes
+    # relevance 9.
+    decile = decile_target(df[fwd_col], by=df[_DATE_COL])
+    y_rank = (9 - decile.astype("float64")).where(decile.notna())
 
     wf_common = dict(
         min_train_weeks=args.min_train_weeks,
         test_weeks=args.test_weeks,
         embargo_weeks=args.embargo_weeks,
     )
+    gbm_cfg = GBMConfig()
 
     # IS-only frame for walk-forward CV.
     df_is = df.loc[is_mask].reset_index(drop=True)
     y_bin_is = y_bin.loc[is_mask].reset_index(drop=True)
+    y_rank_is = y_rank.loc[is_mask].reset_index(drop=True)
 
     def _is_oos_score(
         cv_score_is: pd.Series,
@@ -368,6 +400,52 @@ def main() -> int:
     )
     logit_score = _is_oos_score(logit_score_is, _fit_predict_logit, y_bin)
 
+    # --- 4. GBM classifier (walk-forward) ------------------------------------
+    logger.info("model: gbm_cls (walk-forward)")
+
+    def _fit_predict_gbm_cls(X_tr, y_tr, X_te, _train_idx):
+        model = fit_gbm_classifier(
+            X_tr, y_tr.astype(int),
+            feature_cols=list(X_tr.columns),
+            cfg=gbm_cfg,
+        )
+        return predict_score(model, X_te, list(X_te.columns)).to_numpy()
+
+    gbm_cls_score_is = _walkforward_predict(
+        df_is, feat_cols, y_bin_is, _fit_predict_gbm_cls,
+        model_name="gbm_cls (IS CV)", **wf_common,
+    )
+    gbm_cls_score = _is_oos_score(gbm_cls_score_is, _fit_predict_gbm_cls, y_bin)
+
+    # --- 5. GBM ranker (walk-forward) ----------------------------------------
+    logger.info("model: gbm_rank (walk-forward)")
+
+    def _fit_predict_gbm_rank(X_tr, y_tr, X_te, train_idx):
+        # The ranker needs group_dates aligned with the (filtered) training
+        # rows. train_idx is the positional row index into df_is during CV
+        # (and during final-fit) - use it to look up the matching Date.
+        source = df_is
+        group_dates = source.iloc[train_idx][_DATE_COL].reset_index(drop=True)
+        # Sort by date so groups are contiguous (LightGBM ranker requirement).
+        order = np.argsort(group_dates.to_numpy(), kind="mergesort")
+        X_tr_sorted = X_tr.iloc[order].reset_index(drop=True)
+        y_tr_sorted = y_tr.iloc[order].reset_index(drop=True)
+        gd_sorted = group_dates.iloc[order].reset_index(drop=True)
+        model = fit_gbm_ranker(
+            X_tr_sorted,
+            y_tr_sorted.astype(int),
+            gd_sorted,
+            feature_cols=list(X_tr_sorted.columns),
+            cfg=gbm_cfg,
+        )
+        return predict_score(model, X_te, list(X_te.columns)).to_numpy()
+
+    gbm_rank_score_is = _walkforward_predict(
+        df_is, feat_cols, y_rank_is, _fit_predict_gbm_rank,
+        model_name="gbm_rank (IS CV)", **wf_common,
+    )
+    gbm_rank_score = _is_oos_score(gbm_rank_score_is, _fit_predict_gbm_rank, y_rank)
+
     # --- Stack OOF predictions long ------------------------------------------
     period_labels = np.where(is_mask.to_numpy(), "IS", "OOS")
 
@@ -388,6 +466,8 @@ def main() -> int:
             _stamp("naive", naive_score),
             _stamp("ew", ew_score),
             _stamp("logit", logit_score),
+            _stamp("gbm_cls", gbm_cls_score),
+            _stamp("gbm_rank", gbm_rank_score),
         ],
         ignore_index=True,
     )
@@ -423,10 +503,41 @@ def main() -> int:
     metrics_df.to_csv(settings.reports_dir / metrics_filename, index=False)
     logger.info(f"model_metrics:\n{metrics_df.to_string(index=False)}")
 
+    # --- Calibration table for the GBM classifier ----------------------------
+    gbm_cls_oof = oof[oof["model"] == "gbm_cls"].dropna(subset=["score", _FWD_RET_COL])
+    if len(gbm_cls_oof):
+        labels = (gbm_cls_oof[_FWD_RET_COL] < 0).astype(int)
+        cal = calibration_table(gbm_cls_oof["score"], labels, n_bins=10)
+        cal.to_csv(settings.reports_dir / "calibration_gbm_cls.csv", index=False)
+        logger.info(f"calibration_gbm_cls: {len(cal)} bins")
+
+    # --- Interpretability: full-sample GBM for SHAP / gain importance --------
+    logger.info("interpret: fitting full-sample GBM classifier for SHAP / gain importance")
+    _X_all = df[feat_cols].astype("float64", copy=False).fillna(0.5)
+    train_mask = y_bin.notna()
+    if int(train_mask.sum()) > 0:
+        X_full = _X_all.loc[train_mask]
+        y_full = y_bin.loc[train_mask].astype(int)
+        full_gbm = fit_gbm_classifier(X_full, y_full, feature_cols=feat_cols, cfg=gbm_cfg)
+
+        gi = gain_importance(full_gbm, feat_cols)
+        gi.to_csv(settings.reports_dir / "gain_importance.csv", index=False)
+        logger.info(f"gain_importance: top features = {gi['feature'].head(5).tolist()}")
+
+        try:
+            shap_df = shap_values_sampled(
+                full_gbm, X_full, feat_cols, n_sample=args.shap_n_sample,
+            )
+            mas = mean_abs_shap(shap_df)
+            mas.to_csv(settings.reports_dir / "mean_abs_shap.csv", index=False)
+            plot_shap_summary(shap_df, X_full, settings.charts_dir / "shap_summary.png")
+        except Exception as exc:  # noqa: BLE001 - shap is optional + heavy
+            logger.warning(f"SHAP step failed (continuing without): {exc}")
+
     t1 = dt.datetime.now()
     logger.info(
         f"05_train_and_validate: wrote oof_predictions.parquet, model_metrics.csv "
-        f"| took {(t1 - t0).total_seconds():.1f}s"
+        f"+ interpret artefacts | took {(t1 - t0).total_seconds():.1f}s"
     )
     return 0
 
