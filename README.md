@@ -29,25 +29,34 @@ Net of 25 bps round-trip commission per side + 1.5 % p.a. borrow + 5 bps
 slippage. **No stop loss** — every position realises its full uncapped
 monthly forward return. Annualisation factor = 12 (monthly).
 
+**Sample sizes:** IS = 156 monthly rebalances for `naive` / `ew` (no
+training needed, so they use the full pre-2023-06 panel) and 119 OOF
+monthly observations for the trained models (`logit`, `gbm_cls`,
+`gbm_rank`). OOS = **35 monthly rebalances** for *every* model
+(2023-06 → 2026-05; the 36th month has no forward window). Read
+Sharpes accordingly — 35 monthly returns is a meaningful sample but
+nowhere near "definitive". A Sharpe of 0.9 on n=35 is not the same
+beast as Sharpe 0.9 on n=600.
+
 ### Dollar-neutral long-short quintile (long bottom 20 %, short top 20 % by score)
 
-| Model | **IS Sharpe** | **OOS Sharpe** | OOS CAGR | OOS MaxDD | OOS Hit-rate |
-|---|---:|---:|---:|---:|---:|
-| **naive** (rank ShortPct) | 0.57 | **0.92** | **+11.2 %** | **−10.8 %** | **68.6 %** |
-| logit (rebuilt v1) | 0.24 | 0.24 | +2.9 % | −37.1 % | 48.6 % |
-| ew (long-bias composite) | −0.38 | 0.08 | −0.4 % | −33.1 % | 54.3 % |
-| gbm_rank (LightGBM LambdaRank) | −0.06 | −0.21 | −8.2 % | −51.6 % | 37.1 % |
-| gbm_cls (LightGBM binary) | −0.10 | −1.11 | −16.3 % | −44.4 % | 45.7 % |
+| Model | n_IS | IS Sharpe | n_OOS | **OOS Sharpe** | OOS CAGR | OOS MaxDD | OOS Hit-rate |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| **naive** (rank ShortPct) | 156 | 0.57 | 35 | **0.92** | **+11.2 %** | **−10.8 %** | **68.6 %** |
+| logit (rebuilt v1) | 119 | 0.24 | 35 | 0.24 | +2.9 % | −37.1 % | 48.6 % |
+| ew (long-bias composite) | 156 | −0.38 | 35 | 0.08 | −0.4 % | −33.1 % | 54.3 % |
+| gbm_rank (LightGBM LambdaRank) | 119 | −0.06 | 35 | −0.21 | −8.2 % | −51.6 % | 37.1 % |
+| gbm_cls (LightGBM binary) | 119 | −0.10 | 35 | −1.11 | −16.3 % | −44.4 % | 45.7 % |
 
 ### Top-quintile short only (no long leg)
 
-| Model | OOS Sharpe | OOS CAGR | OOS MaxDD | OOS Hit-rate |
-|---|---:|---:|---:|---:|
-| logit | −0.20 | −6.3 % | −40.9 % | 48.6 % |
-| naive | −0.32 | −7.2 % | −35.7 % | 51.4 % |
-| gbm_rank | −0.50 | −15.2 % | −56.1 % | 40.0 % |
-| ew | −1.12 | −14.8 % | −42.5 % | 34.3 % |
-| gbm_cls | −1.11 | −18.9 % | −53.4 % | 34.3 % |
+| Model | n_OOS | OOS Sharpe | OOS CAGR | OOS MaxDD | OOS Hit-rate |
+|---|---:|---:|---:|---:|---:|
+| logit | 35 | −0.20 | −6.3 % | −40.9 % | 48.6 % |
+| naive | 35 | −0.32 | −7.2 % | −35.7 % | 51.4 % |
+| gbm_rank | 35 | −0.50 | −15.2 % | −56.1 % | 40.0 % |
+| ew | 35 | −1.12 | −14.8 % | −42.5 % | 34.3 % |
+| gbm_cls | 35 | −1.11 | −18.9 % | −53.4 % | 34.3 % |
 
 ![Cumulative growth of $1 — solid = quintile-short, dotted = long-short](charts/cumulative_returns_monthly.png)
 
@@ -71,15 +80,17 @@ mostly on the long leg.
 
 The trained models pick **the right names**. Per-position win-rate
 (share of monthly shorts that ended profitable, i.e. the stock fell
-during the month) is at or above 50 % for everything except `ew`:
+during the month) is at or above 50 % for everything except `ew`.
+The `n` column shows the actual number of monthly short positions
+each model placed across the 35-month OOS holdout:
 
-| Model | Per-position win-rate | Median trade | Mean trade | Worst single position |
-|---|---:|---:|---:|---:|
-| **logit** | **53.4 %** | **+1.71 %** | −0.33 % | −218 % (APX 2024-07) |
-| gbm_rank | 52.5 % | +1.85 % | −0.87 % | −218 % (4DX 2025-08) |
-| naive | 50.9 % | +0.43 % | 0.00 % | −177 % (BRN 2024-01) |
-| gbm_cls | 50.8 % | +0.38 % | −1.27 % | −217 % (4DX) |
-| ew | 47.4 % | −0.50 % | −0.56 % | −50 % |
+| Model | n positions | Per-position win-rate | Median trade | Mean trade | Worst single position |
+|---|---:|---:|---:|---:|---:|
+| **logit** | 2,089 | **53.4 %** | **+1.71 %** | −0.33 % | −218 % (APX 2024-07) |
+| gbm_rank | 2,089 | 52.5 % | +1.85 % | −0.87 % | −218 % (4DX 2025-08) |
+| naive | 2,089 | 50.9 % | +0.43 % | 0.00 % | −177 % (BRN 2024-01) |
+| gbm_cls | 2,089 | 50.8 % | +0.38 % | −1.27 % | −217 % (4DX) |
+| ew | 2,089 | 47.4 % | −0.50 % | −0.56 % | −50 % |
 
 `logit`'s **median** trade is **+1.71 %** (most months win) but its
 **mean** is **−0.33 %**. The gap is fat-right-tail squeezes — APX
@@ -95,6 +106,45 @@ universe, short-interest dispersion is the dominant cross-sectional
 signal; the trained models earn back a real but small slice on top
 when their picks don't get squeezed. **That is itself the headline
 research finding.**
+
+---
+
+## ⚠️ Important disclaimer — what this project is, and isn't
+
+**This is a research demonstration, not a fundable strategy at scale.**
+The universe is the **ASX small/mid-cap short-interest tail** —
+~500 names with median market cap in the **A$200 m – A$2 bn** range.
+The whole point of the project is to demonstrate that a disciplined,
+no-look-ahead cross-sectional model *can* identify successful short
+positions out of sample, with a > 50 % per-position win-rate on a
+real 36-month holdout.
+
+It is **not** a turnkey alpha source for institutional capital, and
+nothing here should be read as one. Specifically:
+
+- **Capacity is small.** Many shorted names trade < A$5 m/day. Even
+  a A$10 m position would be a meaningful day's volume in the worst
+  names; A$100 m would be impossible to put on without moving the
+  price.
+- **Borrow availability is real-world variable.** Squeeze targets
+  often see borrow vanish entirely; the flat 1.5 % p.a. borrow rate
+  in `CostConfig` is an average, not a constraint.
+- **No market-impact / liquidity-aware sizing.** The backtest
+  equal-weights each leg of the quintile; a real book would have to
+  taper or skip the bottom-of-tail names.
+- **Tax, financing, FX** all assumed away.
+- **No stop loss / risk control** — by design (see Limitations).
+
+A real fund would: (a) restrict the universe to A$2 bn + market caps
+where the alpha may well *not* exist, (b) size positions by liquidity,
+not equal-weight, and (c) layer some kind of tail-risk control. Each
+of those changes the numbers materially. The point of *this*
+repository is to show the methodology — universe construction, point-
+in-time fundamentals, walk-forward CV with purge/embargo, IS vs OOS
+discipline, cost-aware backtest — applied to a problem (short-
+selection on the ASX small-mid-cap tail) where there's a measurable
+signal to recover. Treat the headline Sharpes as evidence-of-process,
+not as a fund prospectus.
 
 ---
 
@@ -190,8 +240,8 @@ before it. Like asking 400 experts each "is this stock going to fall?"
 then taking a weighted vote.
 
 **The math:** Friedman gradient boosting on cross-entropy. Each tree
-splits the feature space (e.g. "is `mom_12w_rk > 0.6` AND
-`ShortPct_rk > 0.8`?") and outputs a probability adjustment.
+splits the feature space (e.g. "is **3-month momentum rank** > 0.6 AND
+**short-interest rank** > 0.8?") and outputs a probability adjustment.
 Trained with early stopping on a held-out fold to prevent overfit.
 Score = final ensemble probability.
 
@@ -226,9 +276,9 @@ which names rank highest *within this month's cross-section*. Ranking
 loss directly optimises that.
 
 **Limitation:** Same overfitting risk as `gbm_cls`. Also more
-sensitive to the label horizon: if you change the monthly forward
-return (`fwd_ret_4w`) to a longer horizon (`fwd_ret_8w`) the ranking
-changes more than the binary label would.
+sensitive to the label horizon — changing the forward-return window
+from 1 month to 2 months shifts the ranking more than it would shift
+a binary label.
 
 ### Why have so many models?
 
@@ -306,9 +356,9 @@ A reader-friendly walkthrough of the metrics on this page.
   on data from after its test window.
 - **Purge + embargo** — extra safety on top of walk-forward:
   *purge* drops training samples that overlap the test labels'
-  horizon (here, 4 weeks); *embargo* drops the next 4 weeks
-  after the test window. Stops information from leaking via
-  the forward-return label.
+  horizon (here, ~1 month); *embargo* drops the following ~1
+  month after the test window. Stops information from leaking
+  via the forward-return label.
 
 ### Portfolio construction
 
@@ -389,7 +439,7 @@ benefits from the long leg.
 * Universe = **top 500 ASX tickers by ASIC-report frequency** over the
   full 16 years, gated at ≥ A$200 m market cap on each rebalance.
 
-### 2. Data sources
+### 2. Data sources — and why the Yahoo / FMP split
 
 | What | Source | Why |
 |---|---|---|
@@ -398,6 +448,20 @@ benefits from the long leg.
 | Fundamentals (7 quarterly endpoints) | Financial Modeling Prep (Premium) | Income, balance sheet, cash flow, ratios, key metrics, enterprise values, financial growth |
 | Market capitalisation | **FMP enterprise_values endpoint** (half-yearly, split-adjusted) | The balance-sheet `commonStockSharesOutstanding` field is stamped at the latest period-end and isn't back-adjusted across corporate actions. Using FMP's `enterprise_values.marketCapitalization` correctly handles reverse splits (e.g. Paladin Energy 1:100 in 2024 — see [Data audit](#data-audit) below). |
 | Sector / industry | _not currently pulled_ — known limitation | FMP `profile` endpoint exists; trivial follow-up to wire in |
+
+**Could we go Yahoo-only?** No — and the reasoning is worth spelling
+out because it's a common question. Yahoo gives us **excellent
+prices** going back > 25 years, which is why prices already come from
+Yahoo (FMP's Starter plan only carries ~5 years for ASX). But Yahoo
+falls down on the fundamentals side: its `yfinance.quarterly_financials`
+only exposes the last ~4 quarters per company in a queryable format,
+its `info` snapshot has trailing ratios without an `acceptedDate`
+(so we can't enforce no-look-ahead), and its `marketCap` is not
+back-adjusted across reverse splits (the same PDN-style bug we
+fixed by switching to FMP `enterprise_values`). FMP's stable API
+gives us the full 15-year quarterly panel with SEC-filing timestamps.
+**Yahoo for prices + FMP for fundamentals & PIT market cap** is the
+right split; collapsing it either direction loses something material.
 
 ### 3. Features
 
@@ -412,14 +476,16 @@ fundamentals.
 
 ### 4. Targets
 
-The forward-return label is **4 weeks (≈ 1 calendar month)** — the
-monthly rebalance grid means each (Date, Ticker) row's label is the
-return from this Friday rebalance to the next one (~4 weeks later).
-The column is named `fwd_ret_4w` in the data for legacy reasons.
+The forward-return label is **1 month** — for each (Date, Ticker) it's
+the return from this Friday rebalance to the next one. The column is
+named `fwd_ret_4w` in the data for legacy reasons (4 weeks ≈ 1 calendar
+month on the rebalance grid); the variable is monthly throughout the
+prose.
 
-* **Binary**: `fwd_ret_4w < 0` for the classifier baseline.
-* **Cross-sectional decile rank** of `fwd_ret_4w` (inverted so worst-
-  return = highest relevance) for the LambdaRank model.
+* **Binary**: `forward_return < 0` for the classifier baseline.
+* **Cross-sectional decile rank** of the monthly forward return
+  (inverted so worst-return = highest relevance) for the LambdaRank
+  model.
 
 ### 5. Cross-validation (walk-forward + IS/OOS holdout)
 
@@ -428,8 +494,8 @@ The column is named `fwd_ret_4w` in the data for legacy reasons.
   these rows during development, neither for fitting nor for
   hyperparameter selection.
 * On the 156-month **in-sample** portion (2010-07 → 2023-05):
-  walk-forward expanding window with **156-week min train (~36 mo)**,
-  **26-week test (~6 mo)**, **4-week embargo (≥ label horizon)**.
+  walk-forward expanding window with **~36-month min train**,
+  **~6-month test**, **1-month embargo (≥ label horizon)**.
   20 folds total, ~120 monthly OOF observations per trained model.
 * After CV, a final model is fit on the **entire IS panel** and
   applied to the holdout. That single OOS Sharpe is the unbiased
