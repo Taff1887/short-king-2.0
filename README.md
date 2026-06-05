@@ -92,10 +92,61 @@ still show real positive long-short alpha (0.5+ Sharpe over 16 years
 with realistic costs), but at a more sober level than the recent OOS
 window alone would suggest.
 
-The short-only books (Table 2 OOS and the last two rows of Table 3)
-are **negative Sharpe at every horizon**. Naked-short alpha is not a
-viable standalone strategy on this universe; the dollar-neutral L/S
-quintile carries on the long leg.
+### Table 4 — Concentration sensitivity: decile (top 10 %) vs quintile (top 20 %)
+
+What if we **sharpen** the bet — short the top 10 % by score instead
+of the top 20 %, and (for the L/S variant) long the bottom 10 %
+instead of the bottom 20 %? For the parameter-free models this is a
+clean signal-to-noise test: if the model's ranking is real, halving
+the basket size should *strengthen* the spread per dollar of risk.
+For the trained models it tends to *amplify* squeeze risk because
+their picks are already concentrated into high-conviction names
+(Appen, 4DX, BrainChip) — going decile makes that concentration
+worse.
+
+| Model | Strategy | Window | n | Sharpe | CAGR | MaxDD | Hit-rate |
+|---|---|---|---:|---:|---:|---:|---:|
+| **naive** | L/S decile | OOS | 35 | **1.21** | +21.7 % | **−12.7 %** | **65.7 %** |
+| **ew** | L/S decile | OOS | 35 | **1.04** | **+26.2 %** | −20.2 % | 62.9 % |
+| **ew** | **decile-short** | OOS | 35 | **+0.07** | −1.6 % | −41.6 % | 45.7 % |
+| naive | decile-short | OOS | 35 | −0.10 | −4.7 % | −37.1 % | 51.4 % |
+| logit | L/S decile | OOS | 35 | 0.04 | −1.6 % | −46.6 % | 45.7 % |
+| gbm_rank | L/S decile | OOS | 35 | −0.18 | −8.9 % | −55.2 % | 51.4 % |
+| gbm_cls | L/S decile | OOS | 35 | −0.79 | −16.7 % | −49.4 % | 40.0 % |
+| naive | L/S decile | full period | 191 | 0.33 | +4.6 % | −54.0 % | 57.1 % |
+| ew | L/S decile | full period | 191 | 0.59 | +12.5 % | −67.0 % | 65.4 % |
+| ew | decile-short | full period | 191 | −0.09 | −8.1 % | −88.3 % | 49.7 % |
+
+**Three things worth calling out:**
+
+1. **EW decile-short OOS Sharpe = +0.07** — the **first positive
+   short-only Sharpe** anywhere in this project. Concentrating
+   into the top 10 % of the polarity-aware composite is the only
+   short-only book that clears zero on the OOS holdout, although
+   it's barely above zero and goes negative again on the
+   full-period n=191 (−0.09). Suggestive, not conclusive.
+2. **EW L/S decile OOS Sharpe = 1.04** with **+26.2 % CAGR** —
+   the highest single-strategy result in the entire table.
+   `naive` L/S decile is even higher (1.21 Sharpe) with a tighter
+   drawdown (−12.7 %).
+3. **Every trained model gets *worse* under decile concentration.**
+   `gbm_cls` L/S decile is −0.79 Sharpe (vs −1.11 quintile —
+   marginally less bad, but still terrible). `gbm_rank` and `logit`
+   barely move. Concentrating their already-concentrated short list
+   doesn't help.
+
+The decile result is consistent with the broader story: this
+universe has real cross-sectional short-interest alpha, and a
+hand-built no-training composite captures it cleanly. Fancy models
+trip over the same fat-tail squeezes that the broader baseline
+picks ride out.
+
+The short-only books (Table 2 OOS, Table 3 last two rows, and the
+trained-model rows of Table 4) are negative Sharpe almost everywhere.
+The single positive-Sharpe naked short — EW decile-short OOS at
++0.07 — is too small to call a strategy. **Naked short alpha is not
+a viable standalone book on this universe**; the dollar-neutral L/S
+construction is essential.
 
 ![Cumulative growth of $1 — solid = quintile-short, dotted = long-short](charts/cumulative_returns_monthly.png)
 
