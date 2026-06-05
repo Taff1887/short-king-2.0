@@ -38,7 +38,7 @@ from short_king.utils.io import read_parquet, write_parquet
 from short_king.utils.logging import logger
 
 # --- Knobs ----------------------------------------------------------------
-DEFAULT_MIN_MKT_CAP_AUD = 200_000_000  # A$200m liquidity gate
+DEFAULT_MIN_MKT_CAP_AUD = 100_000_000  # A$100m liquidity gate
 DEFAULT_MAX_FILING_STALE_QUARTERS = 4
 
 # Calendar-week tolerance for the price as-of join (ASIC Date is a Friday; the

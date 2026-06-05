@@ -1,6 +1,6 @@
 # short-king-2.0 - Results
 
-_Generated 2026-06-05T10:42:34_
+_Generated 2026-06-05T12:41:22_
 
 ## Model metrics (out-of-fold)
 

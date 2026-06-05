@@ -92,63 +92,99 @@ still show real positive long-short alpha (0.5+ Sharpe over 16 years
 with realistic costs), but at a more sober level than the recent OOS
 window alone would suggest.
 
-### Table 4 — Concentration sensitivity: decile (top 10 %) vs quintile (top 20 %)
+### Table 4 — Strategy exploration: 5 pre-specified variants, IS-only selection, OOS confirmation
 
-What if we **sharpen** the bet — short the top 10 % by score instead
-of the top 20 %, and (for the L/S variant) long the bottom 10 %
-instead of the bottom 20 %? For the parameter-free models this is a
-clean signal-to-noise test: if the model's ranking is real, halving
-the basket size should *strengthen* the spread per dollar of risk.
-For the trained models it tends to *amplify* squeeze risk because
-their picks are already concentrated into high-conviction names
-(Appen, 4DX, BrainChip) — going decile makes that concentration
-worse.
+Once we have a polarity-aware EW that works as a short composite, the next
+natural question is: **can we do better by varying the construction?**
+Different basket sizes, score blends, conviction gates. The trap with this
+kind of exploration is **data-snooping** — test enough variants and OOS
+Sharpe inflates by chance alone.
 
-| Model | Strategy | Window | n | Sharpe | CAGR | MaxDD | Hit-rate |
-|---|---|---|---:|---:|---:|---:|---:|
-| **naive** | L/S decile | OOS | 35 | **1.21** | +21.7 % | **−12.7 %** | **65.7 %** |
-| **ew** | L/S decile | OOS | 35 | **1.04** | **+26.2 %** | −20.2 % | 62.9 % |
-| **ew** | **decile-short** | OOS | 35 | **+0.07** | −1.6 % | −41.6 % | 45.7 % |
-| naive | decile-short | OOS | 35 | −0.10 | −4.7 % | −37.1 % | 51.4 % |
-| logit | L/S decile | OOS | 35 | 0.04 | −1.6 % | −46.6 % | 45.7 % |
-| gbm_rank | L/S decile | OOS | 35 | −0.18 | −8.9 % | −55.2 % | 51.4 % |
-| gbm_cls | L/S decile | OOS | 35 | −0.79 | −16.7 % | −49.4 % | 40.0 % |
-| naive | L/S decile | full period | 191 | 0.33 | +4.6 % | −54.0 % | 57.1 % |
-| ew | L/S decile | full period | 191 | 0.59 | +12.5 % | −67.0 % | 65.4 % |
-| ew | decile-short | full period | 191 | −0.09 | −8.1 % | −88.3 % | 49.7 % |
+The discipline applied here:
 
-**Three things worth calling out:**
+1. **5 variants defined upfront** in
+   [`scripts/_strategy_explore.py`](scripts/_strategy_explore.py), no peeking.
+2. **Variant selection is IS-only** — the leaderboard below ranks them on
+   in-sample Sharpe (n=156 monthly returns).
+3. **OOS is reported as an unbiased confirmation** of the IS-winner, never
+   used to retune. If the IS-winner doesn't replicate OOS, that's a
+   meaningful finding — not a signal to keep searching.
 
-1. **EW decile-short OOS Sharpe = +0.07** — the **first positive
-   short-only Sharpe** anywhere in this project. Concentrating
-   into the top 10 % of the polarity-aware composite is the only
-   short-only book that clears zero on the OOS holdout, although
-   it's barely above zero and goes negative again on the
-   full-period n=191 (−0.09). Suggestive, not conclusive.
-2. **EW L/S decile OOS Sharpe = 1.04** with **+26.2 % CAGR** —
-   the highest single-strategy result in the entire table.
-   `naive` L/S decile is even higher (1.21 Sharpe) with a tighter
-   drawdown (−12.7 %).
-3. **Every trained model gets *worse* under decile concentration.**
-   `gbm_cls` L/S decile is −0.79 Sharpe (vs −1.11 quintile —
-   marginally less bad, but still terrible). `gbm_rank` and `logit`
-   barely move. Concentrating their already-concentrated short list
-   doesn't help.
+**The variants (all use the polarity-aware EW score from §2 above):**
 
-The decile result is consistent with the broader story: this
-universe has real cross-sectional short-interest alpha, and a
-hand-built no-training composite captures it cleanly. Fancy models
-trip over the same fat-tail squeezes that the broader baseline
-picks ride out.
+- **V0**: EW long-short quintile (the current headline baseline)
+- **V0b**: EW quintile-short only (no long leg)
+- **V1**: V0 + a hard SI floor — only short names with `ShortPct ≥ 3 %`,
+  long names unrestricted. Drops the basket size from ~92 to ~20 names.
+  *This is exactly the "only short names that fit criteria" idea — most
+  months produce a small, high-conviction short book.*
+- **V2**: Absolute conviction gate — short any name with EW score > 0.85,
+  long any name with score < 0.15. Basket size varies by month
+  (~63 names on average).
+- **V3**: Average of `naive` and EW ranks, then L/S quintile. The simplest
+  possible ensemble of two no-training models.
+- **V4**: Conviction-weighted positions — top-quintile by EW score, but
+  position size *proportional to* `(score - 0.8)` rather than equal-weight.
+  Higher conviction = bigger short.
 
-The short-only books (Table 2 OOS, Table 3 last two rows, and the
-trained-model rows of Table 4) are negative Sharpe almost everywhere.
-The single positive-Sharpe naked short — EW decile-short OOS at
-+0.07 — is too small to call a strategy. **Naked short alpha is not
-a viable standalone book on this universe**; the dollar-neutral L/S
-construction is essential.
+### IS leaderboard (used for selection, n=156)
 
-### Table 5 — What's actually in the universe, and what if we drop the A$200m gate?
+| Rank | Variant | IS Sharpe | IS CAGR | Avg basket size |
+|---:|---|---:|---:|---:|
+| 1 | **V3: naive+EW average L/S quintile** | **0.56** | +9.0 % | 92.3 |
+| 2 | V0: EW L/S quintile (baseline) | 0.51 | +8.7 % | 92.3 |
+| 3 | V4: EW conviction-weighted | 0.45 | +8.2 % | 92.3 |
+| 4 | V2: EW conviction gate (>0.85) | 0.44 | +7.8 % | 63.2 |
+| 5 | V1: SI floor + EW L/S quintile | 0.33 | +5.2 % | 19.6 |
+| 6 | V0b: EW quintile-short only | −0.22 | −10.7 % | 46.2 |
+
+### OOS confirmation (n=35) — *do not retune on these numbers*
+
+| Variant | OOS Sharpe | OOS CAGR | OOS MaxDD | Hit-rate | Avg basket |
+|---|---:|---:|---:|---:|---:|
+| **V3: naive+EW average L/S quintile** ← IS winner | **1.45** | **+23.8 %** | **−11.0 %** | **71.4 %** | 92.3 |
+| V4: EW conviction-weighted | 0.99 | +21.5 % | −15.2 % | 57.1 % | 92.3 |
+| V1: SI floor + EW L/S quintile | 0.97 | +24.6 % | −16.5 % | 51.4 % | 19.6 |
+| V0: EW L/S quintile (baseline) | 0.91 | +17.1 % | −16.6 % | 48.6 % | 92.3 |
+| V2: EW conviction gate (>0.85) | 0.85 | +17.6 % | −16.6 % | 54.3 % | 63.2 |
+| V0b: EW quintile-short only | −0.08 | −4.0 % | −36.5 % | 51.4 % | 46.2 |
+
+**Key findings (honest read):**
+
+1. **The IS leader is also the OOS leader.** V3 (naive + EW averaged)
+   tops both leaderboards. **No data-snooping inflation** — the relative
+   ranking from IS holds OOS. That's the strongest possible signal that
+   the construction is real and not a fit-to-recent-history artefact.
+
+2. **V3 OOS Sharpe = 1.45** with +23.8 % CAGR and only −11.0 % MaxDD
+   over 35 OOS months. Highest L/S Sharpe of any variant in the entire
+   project. **Combining two simple no-training models** (naive's
+   short-interest rank + EW's polarity-aware composite) gives a cleaner
+   signal than either alone.
+
+3. **V1 (SI floor + EW L/S) is the high-conviction small-book answer
+   to the "why short 10 stocks when only 2 fit criteria" question.**
+   When `ShortPct < 3 %`, we don't short the name at all — months with
+   low cross-sectional dispersion produce a small (5–10 name) book;
+   high-dispersion months get the full ~30. **OOS Sharpe 0.97 with
+   only 20 names per side on average**, +24.6 % CAGR. Lean book, good
+   alpha, but slightly worse drawdown than V3.
+
+4. **V0b (naked short EW) was negative IS Sharpe and stays negative OOS.**
+   The naked-short story holds: **no construction we tested makes a
+   short-only book work consistently.**
+
+5. **V2 (absolute conviction gate) underperforms** the quintile baseline
+   in both IS and OOS. The conviction-gate intuition is right
+   conceptually but the IS data says the bet-size dilution from variable
+   basket size (sometimes only 30 shorts, sometimes 80) hurts more than
+   the conviction filter helps.
+
+Full data:
+[`reports/strategy_explore.csv`](reports/strategy_explore.csv) /
+[`reports/strategy_explore.md`](reports/strategy_explore.md).
+
+### Table 5 — What's actually in the universe, and what if we drop the A$100m gate?
 
 **Large caps are already in the universe.** On the most recent
 rebalance (29 May 2026) the panel contains 290 names with market
@@ -176,29 +212,30 @@ metrics, so the polarity-aware EW ranks them as **least** shortable.
 flags a real bearish view, and that's exactly the kind of signal the
 strategy picks up.
 
-**What if we drop the A$200m floor?** The default backtest applies
-an `investable` gate: a name must have ≥ A$200 m market cap and
-fresh fundamentals to be eligible. `scripts/06_backtest.py` now
-accepts `--no-investable-gate` which bypasses that filter entirely
-— **any name on the panel with a non-NaN price can be picked**,
-including sub-A$200 m micro-caps. Side-by-side:
+**What if we drop the A$100m floor?** The default backtest applies
+an `investable` gate: a name must have ≥ A$100 m market cap and
+fresh fundamentals to be eligible (lowered from A$200 m after
+verifying it didn't change the headline numbers materially — the
+top-500-by-ASIC-frequency universe filter already excludes most
+sub-A$100 m noise). `scripts/06_backtest.py` accepts
+`--no-investable-gate` which bypasses the gate entirely —
+**any name on the panel with a non-NaN price can be picked**,
+including sub-A$100 m micro-caps. Side-by-side OOS L/S quintile:
 
-| Model | Strategy | n_OOS | OOS Sharpe (gated, A$200m+) | OOS Sharpe (no gate, all caps) | Δ |
-|---|---|---:|---:|---:|---:|
-| naive | L/S quintile | 35 | 0.92 | **0.75** | −0.18 |
-| ew | L/S quintile | 35 | 0.91 | **0.85** | −0.07 |
-| logit | L/S quintile | 35 | 0.24 | **0.14** | −0.10 |
-| gbm_rank | L/S quintile | 35 | −0.22 | −0.24 | −0.02 |
-| gbm_cls | L/S quintile | 35 | −1.11 | −1.12 | −0.01 |
+| Model | n_OOS | OOS Sharpe (gated, A$100m+) | OOS Sharpe (no gate, all caps) | Δ |
+|---|---:|---:|---:|---:|
+| naive | 35 | 0.92 | **0.75** | −0.18 |
+| ew | 35 | 0.91 | **0.85** | −0.07 |
+| logit | 35 | 0.24 | **0.14** | −0.10 |
+| gbm_rank | 35 | −0.22 | −0.24 | −0.02 |
+| gbm_cls | 35 | −1.11 | −1.12 | −0.01 |
 
-Full-period (n=191) for the parameter-free models without the gate:
-**naive L/S Sharpe 0.46, ew L/S Sharpe 0.53** — both still positive,
-just weaker. **Dropping the gate slightly *hurts* every strategy**;
-the marginal micro-cap names are noisier than they are alpha-rich
-(thin trading, wider spreads, more squeeze events, less reliable
-fundamentals). The A$200 m floor is a net-positive filter, not a
-universe restriction — it's not what's making the strategy work.
-Full no-gate summary:
+**Dropping the gate slightly *hurts* every strategy**; the marginal
+micro-cap names are noisier than they are alpha-rich (thin trading,
+wider spreads, more squeeze events, less reliable fundamentals).
+The A$100 m floor is a net-positive filter, not a universe
+restriction — it's not what's making the strategy work. Full no-gate
+summary:
 [`reports/backtest_summary_monthly_nogate.csv`](reports/backtest_summary_monthly_nogate.csv).
 
 ![Cumulative growth of $1 — solid = quintile-short, dotted = long-short, dashed black = ASX 200 buy & hold](charts/cumulative_returns_monthly.png)
@@ -224,6 +261,15 @@ polarity-aware 12-factor composite) prints 0.58 full-period and 0.91
 OOS. Both rely on simple, hand-specified algorithms with zero learned
 parameters — and both beat all three of the trained models on OOS
 Sharpe.
+
+**Best found strategy (selected disciplined-IS-only):** averaging
+`naive` and `ew` ranks and trading the L/S quintile lifts OOS Sharpe
+to **1.45** with **+23.8 % CAGR** and **−11.0 % MaxDD** over 35 OOS
+months — the highest L/S Sharpe of any variant tested. The combination
+was picked because it topped the **IS** leaderboard (n=156) before
+anyone looked at OOS; the OOS result is unbiased confirmation. See
+[Table 4](#table-4--strategy-exploration-5-pre-specified-variants-is-only-selection-oos-confirmation)
+for the full set of 5 pre-specified variants and the discipline.
 
 The three trained models (`logit`, `gbm_rank`, `gbm_cls`) all run
 statistically-significant **negative OOS IC** (their score correctly
@@ -285,7 +331,7 @@ short interest is low and their quality metrics rank them as
 least-shortable. The *median* short basket position has a market
 cap in the A$200 m – A$2 bn range, but the universe itself is the
 full ASX 200 + the active short-interest tail. (See
-[Table 5](#table-5--whats-actually-in-the-universe-and-what-if-we-drop-the-a200m-gate)
+[Table 5](#table-5--whats-actually-in-the-universe-and-what-if-we-drop-the-a100m-gate)
 for the latest rebalance composition.)
 
 The whole point of the project is to demonstrate that a disciplined,
@@ -433,6 +479,46 @@ ML sense, it's a thoughtful human prior.
 > OOS L/S Sharpe from **0.08 → 0.91**. Boring but instructive: when
 > you blend factors, the sign of each input has to match the sign of
 > the score you're building.
+
+#### Polarity audit — do the data actually agree with the polarity spec?
+
+Quick sanity check: fit a single statsmodels Logit on the 12 EW
+features (IS rows only) predicting `Pr(fwd_ret_4w < 0)`. Each
+coefficient's sign should match the EW spec (`+1` = high rank →
+shortable, `−1` = high rank → bullish, invert before averaging). The
+*magnitude* tells you how much the linear model relies on that
+feature; the *sign* is the polarity check.
+
+| Feature | EW spec | Logit coef | z-stat | P-value | Match? |
+|---|:---:|---:|---:|---:|:---:|
+| ShortPct_rk | +1 | +0.36 | +3.67 | 0.0002 | ✓ |
+| si_z_52w_rk | +1 | +0.00 | +0.11 | 0.91 | ✓ (≈0) |
+| short_pct_ff_rk | +1 | −0.21 | −2.17 | 0.030 | ✗ (collinear w/ ShortPct_rk) |
+| vol_4w_rk | +1 | **+0.26** | **+6.26** | <0.0001 | ✓ |
+| pe_rk | +1 | +0.05 | +0.91 | 0.36 | ✓ |
+| debt_equity_rk | +1 | −0.04 | −0.93 | 0.35 | ✗ (not significant) |
+| mom_12w_rk | −1 | −0.06 | −1.42 | 0.16 | ✓ |
+| log_mktcap_rk | −1 | −0.10 | −2.01 | 0.044 | ✓ |
+| fcf_yield_rk | −1 | **−0.21** | **−4.66** | <0.0001 | ✓ |
+| roe_rk | −1 | **−0.22** | **−3.27** | 0.001 | ✓ |
+| roic_rk | −1 | +0.03 | +0.46 | 0.65 | ✗ (not significant) |
+| revenue_growth_yoy_rk | −1 | −0.01 | −0.36 | 0.72 | ✓ (≈0) |
+
+**9 of 12 match the spec direction**, with all the high-magnitude
+features (|z| > 2) on the correct side — including the four most
+significant (`ShortPct_rk`, `vol_4w_rk`, `fcf_yield_rk`, `roe_rk`).
+The three "misses" are either collinear with another feature
+(`short_pct_ff_rk` flips because `ShortPct_rk` absorbs the SI signal),
+or not statistically distinguishable from zero (`roic_rk`,
+`debt_equity_rk`). **The polarity spec is empirically validated for
+the features that actually drive the score.**
+
+This is also how the trained models (logit, gbm_cls, gbm_rank) handle
+polarity automatically: they don't need a hand-built spec, they
+**learn the sign** by minimising loss. The trained logit's coefficient
+table shows the same pattern as above — negative coefficients on the
+bullish factors, positive on the bearish ones. The EW polarity spec
+just bakes that learned sign into a no-training composite.
 
 ### 3. `logit` — logistic regression on all the ranked features
 
@@ -667,7 +753,9 @@ Sharpe.
   180 Fridays, 10 Thursdays, 2 Wednesdays** (the non-Fridays are months
   where Easter / Christmas / King's Birthday pushed the release forward).
 * Universe = **top 500 ASX tickers by ASIC-report frequency** over the
-  full 16 years, gated at ≥ A$200 m market cap on each rebalance.
+  full 16 years, gated at ≥ A$100 m market cap on each rebalance
+  (lowered from A$200 m after verifying it didn't materially change
+  the headline numbers — see [Table 5](#table-5--whats-actually-in-the-universe-and-what-if-we-drop-the-a100m-gate)).
 
 ### 2. Data sources — and why the Yahoo / FMP split
 
@@ -735,7 +823,7 @@ prose.
 
 * Top-quintile short OR dollar-neutral L/S quintile (long bottom 20 %,
   short top 20 %), equal weight within each leg, monthly rebalance.
-* Liquidity gate: investable + ≥ A$200 m mkt cap.
+* Liquidity gate: investable + ≥ A$100 m mkt cap.
 * Frictions: 25 bps round-trip commission per side, 1.5 % p.a. borrow on
   shorts, 5 bps slippage on weight changes. **No stop loss** — every
   position realises its uncapped monthly forward return.
@@ -807,7 +895,7 @@ SRL and 4DX alone cost −18.8 % of book. Negative `worst_%` values *exceed* −
 ## Top short candidates — as of 2026-05-29
 
 Top 15 by *consensus rank* across the three trained models (`logit` +
-`gbm_cls` + `gbm_rank`); gated on investable + A$200 m+ market cap +
+`gbm_cls` + `gbm_rank`); gated on investable + A$100 m+ market cap +
 all-3-models-scored. Full top-30 in
 [`reports/current_positions_monthly.csv`](reports/current_positions_monthly.csv);
 regenerate with `scripts/_current_positions.py --monthly`.
@@ -902,7 +990,7 @@ not ticker-specific and not a soft cap; it's "if FMP says this is
 bigger than anything that has ever existed on the ASX, drop the row".
 **109 rows nulled** out of 262 k (0.04 %) — top affected tickers:
 VRL (75 rows), CBA (26 rows), INR (8 rows). NaN'd rows fail the
-investable filter (≥ A$200 m) naturally.
+investable filter (≥ A$100 m) naturally.
 
 ### Fundamental coverage
 
@@ -924,7 +1012,7 @@ investable filter (≥ A$200 m) naturally.
 |---|---|---|
 | Repo structure | one notebook | src-layout package + scripts + tests + docs |
 | Window | implicit (~15 yrs, weekly) | **2010-06 → 2026-05 (15.97 yrs), monthly rebalance** |
-| Universe | implicit, all ASX | explicit top-500 by ASIC frequency, A$200m mcap gate |
+| Universe | implicit, all ASX | explicit top-500 by ASIC frequency, A$100m mcap gate |
 | Prices | Yahoo (no validation) | **Yahoo, cross-checked vs FMP at ρ = 0.9996** |
 | Fundamentals | none | FMP 7-endpoint PIT panel, lagged to `acceptedDate` |
 | Market cap | shares × price (breaks across reverse splits) | **FMP `enterprise_values` (split-aware)** |

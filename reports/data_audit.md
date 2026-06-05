@@ -1,6 +1,6 @@
 # Data audit — short-king-2.0
 
-_Generated 2026-06-04 23:10 UTC_
+_Generated 2026-06-05 02:40 UTC_
 
 ## 1. Universe coverage
 - **asic_long**: 262,251 rows | 500 unique tickers | 833 dates | window 2010-06-14 → 2026-05-25
