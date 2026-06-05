@@ -398,15 +398,118 @@ scope* here to keep the focus on "does the signal work".
 
 ---
 
-## Today's short candidates
+## Current short picks — what the models are flagging right now
 
-The top 15 names by **consensus rank** across all 5 models on
-the most recent rebalance (29 May 2026). Higher rank = stronger
-short conviction (all 5 models agree).
+_As of the most recent rebalance: **29 May 2026**. Investable universe
+size: 272 names (≥ A$100 m market cap, fresh fundamentals, valid
+adjusted close)._
 
-See [`reports/current_positions_monthly.md`](reports/current_positions_monthly.md)
-for the full table with per-model scores and the per-factor
-breakdown showing **why** each name is flagged.
+### Top 10 by consensus across all 5 models
+
+The names every model agrees are in the bearish tail. `consensus_rk`
+is the average of each model's cross-sectional percentile rank on
+this date — robust to the different output scales (gbm_rank is
+z-scored; the rest are 0-1).
+
+| # | Ticker | Company | Mkt Cap (A$m) | Short % | naive | ew | logit | gbm_cls | gbm_rank | consensus_rk |
+|---:|---|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| 1 | **MSB** | Mesoblast | 1,898 | 8.66 | 0.934 | **0.972** | 0.676 | 0.435 | −0.375 | **0.909** |
+| 2 | **CAT** | Catapult Sports | 983 | 5.15 | 0.848 | **0.976** | 0.561 | 0.567 | −0.110 | **0.904** |
+| 3 | **TLX** | Telix Pharmaceuticals | 3,794 | **15.15** | **0.993** | 0.845 | 0.584 | 0.533 | −0.841 | 0.896 |
+| 4 | **ILU** | Iluka Resources | 2,488 | 7.53 | 0.900 | 0.914 | 0.619 | 0.557 | −1.310 | 0.890 |
+| 5 | **4DX** | 4D Medical | 1,948 | 10.06 | 0.969 | 0.812 | 0.549 | 0.557 | **+0.285** | 0.887 |
+| 6 | EOS | Electro Optic Systems | 1,821 | 3.59 | 0.748 | 0.800 | 0.604 | 0.562 | −0.423 | 0.865 |
+| 7 | VUL | Vulcan Energy | 630 | 4.65 | 0.831 | **0.969** | 0.578 | 0.438 | −0.632 | 0.855 |
+| 8 | SBM | St Barbara | 702 | 3.57 | 0.745 | **0.955** | 0.584 | 0.465 | −0.548 | 0.854 |
+| 9 | WEB | Web Travel Group | 943 | 5.56 | 0.857 | **0.966** | 0.560 | 0.422 | −0.309 | 0.839 |
+| 10 | ACL | Au Clinical Labs | 533 | 8.35 | 0.924 | 0.903 | 0.569 | 0.533 | −1.642 | 0.839 |
+
+**MSB, CAT, TLX, ILU, 4DX** are the names where the broadest agreement
+sits — all 5 models flag these as top-decile shortable. **`gbm_rank`'s
+ordering matters most here** since LambdaRank's objective directly
+optimises the "rank the worst stocks at the top" loss; 4DX is its
+only positive-score pick in the top 10 (everything else is negative,
+which is gbm_rank's output range for less-shortable names).
+
+### Top 5 per individual model — the disagreements are informative
+
+Names that appear in multiple top-5s = broad signal. Names that appear
+in only ONE model's top-5 = "this model alone thinks this", which is
+often the most informative signal.
+
+| Rank | naive | ew | logit | gbm_cls | gbm_rank |
+|---:|---|---|---|---|---|
+| 1 | **LOT** (SI 19.5%) | **LOT** (SI 19.5%) | **SHL** (Sonic Healthcare, A$11 bn) | **MMS** (McMillan Shakespeare) | **EGR** (EcoGraf, micro-cap) |
+| 2 | DMP (Dominos, SI 15.2%) | NVX (Novonix) | **WOW** (Woolworths, A$36 bn) | **AGI** (Ainsworth Game Tech) | **4DX** (4D Medical) |
+| 3 | TLX (SI 15.2%) | HLS (Healius) | SXL (Sthn Cross Media) | BBN (Baby Bunting) | BBN (Baby Bunting) |
+| 4 | BOE (Boss Energy, SI 14.3%) | IMU (Imugene) | EML (EML Payments) | EGR (EcoGraf) | TTT (Titomic) |
+| 5 | TWE (Treasury Wine, SI 13.1%) | BAP (Bapcor) | RIC (Ridley Corp) | NHC (New Hope Coal) | LTR (Liontown) |
+
+**A few observations:**
+
+* **Naive picks the highest SI names**, by definition. LOT (Lotus
+  Resources) at 19.5 % SI tops both naive and ew — that's the
+  cleanest cross-model signal in the universe.
+* **EW picks similar names to naive** but with valuation / quality
+  overlay (NVX, HLS, IMU all have weak fundamentals on top of
+  elevated SI).
+* **Logit picks mega-caps that other models ignore.** SHL (Sonic
+  Healthcare, A$11 bn) and WOW (Woolworths, A$36 bn) appear in
+  *no other* model's top-5. The logit linear weights have learned
+  to combine moderate SI with deteriorating fundamentals in
+  a way that flags mega-caps that the other models — which lean
+  more on raw SI — don't see. These are the most contrarian short
+  candidates in the system right now.
+* **GBM classifier picks low-SI multi-factor shorts.** MMS (5.6% SI),
+  AGI (0% SI), BBN (0.3% SI) — names with weak fundamentals across
+  the board where the binary classifier sees compounding bearish
+  signals without needing crowded SI.
+* **GBM ranker picks the squeeze-y micro-caps.** EGR, TTT — small
+  speculative names with terrible fundamentals. LambdaRank rewards
+  pulling the worst-future-return names to the top, regardless of
+  size. These overlap with `gbm_cls`'s picks (BBN, EGR shared)
+  because both use the same boosted-tree machinery.
+
+### Why these names? Factor breakdown for the top 10 consensus picks
+
+Every cell is **0–1** (higher = more shortable on that factor).
+`(inv)` columns are naturally-bullish ranks flipped via `1 − rank` so
+polarity is consistent across the table.
+
+| # | Ticker | SI | SI z | mom (inv) | vol | P/E | FCF-y (inv) | ROE (inv) | D/E | growth (inv) | EW factor avg |
+|---:|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| 1 | MSB | 0.93 | 0.77 | 0.58 | 0.56 | 0.50 | 0.73 | 0.81 | 0.38 | 0.64 | **0.66** |
+| 2 | CAT | 0.85 | 0.61 | 0.74 | **0.97** | 0.50 | 0.57 | 0.84 | 0.18 | 0.64 | 0.65 |
+| 3 | TLX | **0.99** | 0.70 | 0.09 | 0.42 | 0.50 | 0.79 | 0.72 | 0.81 | 0.42 | 0.60 |
+| 4 | ILU | 0.90 | 0.41 | 0.07 | 0.27 | 0.50 | **0.97** | **0.91** | 0.60 | **0.93** | 0.62 |
+| 5 | 4DX | 0.97 | **0.99** | 0.61 | **0.99** | 0.50 | 0.71 | 0.00 | 0.01 | 0.06 | 0.54 |
+| 6 | EOS | 0.75 | 0.68 | 0.18 | 0.95 | 0.50 | 0.74 | 0.88 | 0.29 | 0.07 | 0.56 |
+| 7 | VUL | 0.83 | 0.42 | 0.20 | 0.84 | 0.50 | 0.92 | 0.82 | 0.22 | 0.92 | 0.63 |
+| 8 | SBM | 0.74 | **0.93** | 0.87 | 0.91 | 0.50 | 0.86 | 0.69 | 0.11 | 0.34 | 0.66 |
+| 9 | WEB | 0.86 | 0.84 | 0.64 | 0.90 | 0.87 | 0.51 | 0.62 | 0.54 | 0.64 | **0.71** |
+| 10 | ACL | 0.92 | 0.91 | 0.55 | 0.18 | 0.82 | 0.06 | 0.49 | **0.93** | 0.77 | 0.63 |
+
+**Reading the rows:**
+
+* **WEB (Web Travel Group)** scores 0.71 across the board — the
+  cleanest multi-factor short on the list. Elevated SI, building
+  short interest, falling momentum, expensive P/E, low quality.
+* **ILU (Iluka Resources)** is the quality / growth play — high
+  SI is moderate (0.90) but FCF, ROE, and growth all score 0.91+
+  on the bearish side. The model is seeing deteriorating mining
+  fundamentals.
+* **4DX (4D Medical)** is a high-conviction squeeze candidate —
+  SI z-score = 0.99 (SI building from already-elevated levels),
+  vol = 0.99 (volatile), but ROE / debt / growth all score
+  near 0 because it has no earnings / debt / revenue to speak
+  of. **This is the textbook squeeze profile** — concentrated
+  short interest on a story stock with no fundamentals to
+  anchor it.
+
+**Live data, regenerate any time:**
+[`reports/current_short_picks.csv`](reports/current_short_picks.csv) /
+[`reports/current_short_picks.md`](reports/current_short_picks.md)
+via `scripts/_current_short_picks.py`.
 
 ---
 
