@@ -54,15 +54,11 @@ def _asx200_returns(dates: pd.DatetimeIndex) -> pd.Series | None:
     return rets
 
 
-def main() -> int:
-    settings.ensure_dirs()
-    oof = read_parquet(settings.reports_dir / "oof_predictions_monthly.parquet")
-
-    # Load each (model, strategy) monthly returns parquet (stopped).
-    series_map: dict[str, pd.Series] = {}
+def _load_returns(suffix: str = "") -> dict[str, pd.Series]:
+    series: dict[str, pd.Series] = {}
     for model in MODELS:
         for strategy in STRATEGIES:
-            p = settings.reports_dir / f"backtest_monthly_{model}_{strategy}.parquet"
+            p = settings.reports_dir / f"backtest_monthly_{model}_{strategy}{suffix}.parquet"
             if not p.exists():
                 logger.warning(f"missing {p}, skipping")
                 continue
@@ -72,7 +68,19 @@ def main() -> int:
                 index=pd.to_datetime(df["Date"]).dt.normalize(),
                 name=f"{model}/{strategy}",
             ).sort_index()
-            series_map[s.name] = s
+            series[s.name] = s
+    return series
+
+
+def main() -> int:
+    settings.ensure_dirs()
+    oof = read_parquet(settings.reports_dir / "oof_predictions_monthly.parquet")
+
+    # Load both the STOPPED parquets (headline) and the NO-STOP copies if
+    # available. The no-stop set lives alongside as *_nostop.parquet so the
+    # README can show both charts side-by-side.
+    series_map = _load_returns()  # stopped (headline)
+    series_map_nostop = _load_returns("_nostop")
 
     if not series_map:
         logger.error("no backtest parquets found")
@@ -80,16 +88,26 @@ def main() -> int:
 
     # Build the returns DataFrame for the chart (one column per strategy).
     returns_df = pd.DataFrame(series_map).sort_index()
+    returns_df_nostop = (
+        pd.DataFrame(series_map_nostop).sort_index() if series_map_nostop else None
+    )
 
     # ASX 200 returns on the same monthly grid.
     bench = _asx200_returns(pd.DatetimeIndex(returns_df.index))
     if bench is None:
         logger.warning("ASX 200 benchmark unavailable, chart will skip it")
 
-    # ---- Chart ----------------------------------------------------------------
+    # ---- Chart (stopped headline) -------------------------------------------
     chart_path = settings.charts_dir / "cumulative_returns_monthly.png"
     rc.chart_cumulative_returns(returns_df, chart_path, bench=bench)
     logger.info(f"wrote {chart_path}")
+
+    # ---- Chart (no-stop comparison) -----------------------------------------
+    if returns_df_nostop is not None:
+        bench_nostop = _asx200_returns(pd.DatetimeIndex(returns_df_nostop.index))
+        nostop_path = settings.charts_dir / "cumulative_returns_monthly_nostop.png"
+        rc.chart_cumulative_returns(returns_df_nostop, nostop_path, bench=bench_nostop)
+        logger.info(f"wrote {nostop_path}")
 
     # ---- Headline table with ASX 200 row -------------------------------------
     # IS / OOS periods per the OOF predictions.

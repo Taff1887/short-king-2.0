@@ -114,7 +114,17 @@ Ranked by OOS Sharpe. **Stop = 50 % trigger + 10 % slippage + gap rule.**
 > 2013-07 onwards. The naive and EW composites are parameter-free, so
 > they cover the full panel.
 
-![Cumulative growth of $1 — solid = quintile-short, dotted = long-short, dashed = ASX 200 buy & hold](charts/cumulative_returns_monthly.png)
+![Cumulative growth of $1 — solid = quintile-short, dotted = long-short, dashed = ASX 200 buy & hold (50 % stop applied)](charts/cumulative_returns_monthly.png)
+*Cumulative growth with the **50 % stop applied** to every short position.*
+
+![Cumulative growth of $1 — no stop loss (raw monthly returns)](charts/cumulative_returns_monthly_nostop.png)
+*Same backtest **without any stop loss** — every short realises its full
+uncapped monthly P&L. EW L/S quintile (blue dotted) reaches $4.5,
+naive L/S quintile (black dotted) reaches $2.7, both meaningfully
+above the ASX 200 buy & hold (dashed black) at $2.0. This is what the
+signal looks like before realistic squeeze-execution friction eats
+into it — useful for "where does the alpha live" but not achievable in
+practice without the gap penalty hitting the real squeezes.*
 
 ### Table 1b — No-stop comparison: what the strategy could do without ANY stop
 
