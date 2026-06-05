@@ -41,10 +41,59 @@ def _parse_args() -> argparse.Namespace:
                    help="Annualised borrow fee on short positions, %% p.a.")
     p.add_argument("--slippage-bps", type=float, default=5.0,
                    help="One-sided slippage on weight changes, bps.")
+    p.add_argument("--no-investable-gate", action="store_true",
+                   help="Override the A$200m+ investable filter and treat EVERY row "
+                        "as eligible. Lets the strategy short any name in the universe "
+                        "(including micro-caps below A$200m). Used to test sensitivity "
+                        "of the headline numbers to the liquidity floor.")
     p.add_argument("--monthly", action="store_true",
                    help="Read OOF predictions from oof_predictions_monthly.parquet, set "
                         "periods_per_year=12, and write backtest_summary_monthly.csv.")
     return p.parse_args()
+
+
+def _fetch_asx200_benchmark(rebalance_dates: pd.DatetimeIndex,
+                             periods_per_year: int) -> pd.Series | None:
+    """Fetch S&P/ASX 200 (^AXJO) closes from Yahoo and resample to rebalance grid.
+
+    Returns a Series of period-returns indexed by rebalance_dates (same calendar
+    as the strategy returns), or None on any failure (no internet, yfinance
+    missing, no data, etc.). Failure is non-fatal — the chart just won't show
+    the benchmark line.
+    """
+    try:
+        import yfinance as yf
+    except ImportError:
+        logger.warning("yfinance not importable; skipping ASX 200 benchmark")
+        return None
+    if len(rebalance_dates) < 2:
+        return None
+    try:
+        start = (rebalance_dates.min() - pd.Timedelta(days=10)).strftime("%Y-%m-%d")
+        end = (rebalance_dates.max() + pd.Timedelta(days=10)).strftime("%Y-%m-%d")
+        raw = yf.download("^AXJO", start=start, end=end, auto_adjust=True,
+                          progress=False, threads=False)
+    except Exception as exc:  # noqa: BLE001 - benchmark fetch is non-essential
+        logger.warning(f"ASX 200 fetch failed: {exc}; skipping benchmark")
+        return None
+    if raw is None or len(raw) == 0:
+        logger.warning("ASX 200: yfinance returned empty frame; skipping benchmark")
+        return None
+    # yfinance multi-column frame: flatten and grab Close
+    if isinstance(raw.columns, pd.MultiIndex):
+        raw = raw.xs("^AXJO", level=1, axis=1) if "^AXJO" in raw.columns.get_level_values(1) else raw.droplevel(1, axis=1)
+    close = raw["Close"] if "Close" in raw.columns else raw.iloc[:, 0]
+    close = close.dropna()
+    close.index = pd.to_datetime(close.index).tz_localize(None).normalize()
+    # Forward-fill to each rebalance date (Friday close); compute period returns.
+    snap = close.reindex(rebalance_dates, method="ffill")
+    rets = snap.pct_change().dropna()
+    rets.name = f"ASX 200 (buy & hold, {len(rets)} months)"
+    if rets.empty:
+        return None
+    logger.info(f"ASX 200 benchmark: {len(rets)} period-returns, "
+                f"period_total={float((1+rets).prod()-1):+.1%}")
+    return rets
 
 
 def _build_prices_panel(clean: pd.DataFrame, features: pd.DataFrame) -> pd.DataFrame:
@@ -164,6 +213,12 @@ def main() -> int:
             on=[_DATE_COL, _TICKER_COL],
             how="left",
         )
+        # --no-investable-gate: treat every row as eligible regardless of the
+        # A$200m mkt-cap floor / fundamentals freshness. Lets the strategy short
+        # the entire universe (including sub-A$200m micro-caps) and produces a
+        # sensitivity number against the gated default.
+        if args.no_investable_gate and "investable" in joined.columns:
+            joined["investable"] = True
 
         for strategy_name, build_fn in strategies.items():
             weights = build_fn(joined)
@@ -232,10 +287,18 @@ def main() -> int:
     best_key = f"{best_row['model']}/{best_row['strategy']}"
     best_series = returns_panel.get(best_key)
 
+    # ASX 200 buy-and-hold benchmark - fetched from Yahoo and aligned to the
+    # strategy's rebalance grid so the growth-of-$1 curve starts from the same
+    # base. Non-fatal if it fails (e.g. offline cron run).
+    asx200 = _fetch_asx200_benchmark(
+        pd.DatetimeIndex(returns_frame.index), periods_per_year=periods_per_year,
+    ) if not returns_frame.empty else None
+
     chart_jobs = [
         ("cumulative_returns.png",
          lambda: rc.chart_cumulative_returns(returns_frame,
-             settings.charts_dir / ("cumulative_returns_monthly.png" if args.monthly else "cumulative_returns.png"))),
+             settings.charts_dir / ("cumulative_returns_monthly.png" if args.monthly else "cumulative_returns.png"),
+             bench=asx200)),
     ]
     if best_series is not None and len(best_series) > 0:
         chart_jobs += [

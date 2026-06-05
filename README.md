@@ -148,7 +148,72 @@ The single positive-Sharpe naked short — EW decile-short OOS at
 a viable standalone book on this universe**; the dollar-neutral L/S
 construction is essential.
 
-![Cumulative growth of $1 — solid = quintile-short, dotted = long-short](charts/cumulative_returns_monthly.png)
+### Table 5 — What's actually in the universe, and what if we drop the A$200m gate?
+
+**Large caps are already in the universe.** On the most recent
+rebalance (29 May 2026) the panel contains 290 names with market
+caps spanning **A$9 m → A$268 B** — every major ASX 50 constituent
+is present:
+
+| # | Ticker | Company | Mkt Cap (A$bn) | Short % | Investable? |
+|---:|---|---|---:|---:|---|
+| 1 | CBA | Commonwealth Bank | 268 | 2.1 | ✓ |
+| 2 | RIO | Rio Tinto | 159 | 8.7 | ✓ |
+| 3 | BHP | BHP Group | 154 | 1.4 | ✓ |
+| 4 | WBC | Westpac | 135 | 1.8 | ✓ |
+| 5 | NAB | National Australia Bank | 127 | 1.8 | ✓ |
+| 6 | ANZ | ANZ Group | 108 | 0.8 | ✓ |
+| 7 | WES | Wesfarmers | 92 | 1.1 | ✓ |
+| 8 | CSL | CSL Limited | 84 | 0.7 | ✓ |
+| 9 | MQG | Macquarie Group | 77 | 0.4 | ✓ |
+| 10 | TLS | Telstra | 55 | 0.9 | ✓ |
+
+The strategy *can* short these names — they just rarely make it into
+the top-quintile short basket because mega-caps tend to have low
+reported short interest (CBA = 2.1 %, BHP = 1.4 %) and high quality
+metrics, so the polarity-aware EW ranks them as **least** shortable.
+**RIO at 8.7 % is the exception** — high SI for a mega-cap usually
+flags a real bearish view, and that's exactly the kind of signal the
+strategy picks up.
+
+**What if we drop the A$200m floor?** The default backtest applies
+an `investable` gate: a name must have ≥ A$200 m market cap and
+fresh fundamentals to be eligible. `scripts/06_backtest.py` now
+accepts `--no-investable-gate` which bypasses that filter entirely
+— **any name on the panel with a non-NaN price can be picked**,
+including sub-A$200 m micro-caps. Side-by-side:
+
+| Model | Strategy | n_OOS | OOS Sharpe (gated, A$200m+) | OOS Sharpe (no gate, all caps) | Δ |
+|---|---|---:|---:|---:|---:|
+| naive | L/S quintile | 35 | 0.92 | **0.75** | −0.18 |
+| ew | L/S quintile | 35 | 0.91 | **0.85** | −0.07 |
+| logit | L/S quintile | 35 | 0.24 | **0.14** | −0.10 |
+| gbm_rank | L/S quintile | 35 | −0.22 | −0.24 | −0.02 |
+| gbm_cls | L/S quintile | 35 | −1.11 | −1.12 | −0.01 |
+
+Full-period (n=191) for the parameter-free models without the gate:
+**naive L/S Sharpe 0.46, ew L/S Sharpe 0.53** — both still positive,
+just weaker. **Dropping the gate slightly *hurts* every strategy**;
+the marginal micro-cap names are noisier than they are alpha-rich
+(thin trading, wider spreads, more squeeze events, less reliable
+fundamentals). The A$200 m floor is a net-positive filter, not a
+universe restriction — it's not what's making the strategy work.
+Full no-gate summary:
+[`reports/backtest_summary_monthly_nogate.csv`](reports/backtest_summary_monthly_nogate.csv).
+
+![Cumulative growth of $1 — solid = quintile-short, dotted = long-short, dashed black = ASX 200 buy & hold](charts/cumulative_returns_monthly.png)
+
+**ASX 200 reference (dashed black).** A simple buy-and-hold of the
+S&P/ASX 200 index (Yahoo ticker `^AXJO`) over the same window grew
+$1 → **$1.99 (+99 % total)** with 5.4 % annualised volatility and
+ride-the-market beta = 1. The dollar-neutral L/S quintile strategies
+above are by construction **market-neutral** (β ≈ 0) — they're not
+in competition with index returns in the same way an equity-long
+fund is, they're capturing a *spread*. But it's useful context: a
+0.5–0.6 Sharpe full-period number on a dollar-neutral book is
+genuine alpha because there's no market beta riding underneath it.
+The headline naive L/S quintile finishes at $2.91 — comfortably
+ahead of the index — *with zero market exposure*.
 
 ### What this honestly shows
 
@@ -210,8 +275,19 @@ which factors to combine.
 ## ⚠️ Important disclaimer — what this project is, and isn't
 
 **This is a research demonstration, not a fundable strategy at scale.**
-The universe is the **ASX small/mid-cap short-interest tail** —
-~500 names with median market cap in the **A$200 m – A$2 bn** range.
+The universe is the top ~500 ASX tickers by ASIC-report frequency —
+which **includes every ASX 50 mega-cap** (CBA at A$268 B, RIO/BHP at
+A$150 B+, the big four banks, CSL, Wesfarmers, Macquarie, Telstra)
+**plus the entire small/mid-cap short-interest tail** down to
+~A$9 m. The strategy *can* short any of those names; large-caps just
+rarely make it into the top-quintile short basket because mega-cap
+short interest is low and their quality metrics rank them as
+least-shortable. The *median* short basket position has a market
+cap in the A$200 m – A$2 bn range, but the universe itself is the
+full ASX 200 + the active short-interest tail. (See
+[Table 5](#table-5--whats-actually-in-the-universe-and-what-if-we-drop-the-a200m-gate)
+for the latest rebalance composition.)
+
 The whole point of the project is to demonstrate that a disciplined,
 no-look-ahead cross-sectional model *can* identify successful short
 positions out of sample, with a > 50 % per-position win-rate on a
