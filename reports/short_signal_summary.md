@@ -10,7 +10,7 @@ Per-model, per-bucket short-position outcomes. Every position is a single (Date,
 * `worst` = single worst position (the big squeeze).
 
 
-## OOS
+## OOS — pure out-of-sample, n=35 months, same for every model
 
 | model | bucket | n | win % | median | mean | mean win | mean loss | win/loss ratio | worst |
 |---|---|---|---|---|---|---|---|---|---|
@@ -40,7 +40,37 @@ Per-model, per-bucket short-position outcomes. Every position is a single (Date,
 | naive | top-5 | 175 | +52.57% | +1.44% | +0.77% | +13.52% | -13.36% | 1.01 | -52.31% |
 | logit | top-5 | 175 | +49.14% | +0.00% | -0.21% | +14.80% | -14.72% | 1.00 | -123.98% |
 
-## IS
+## IS (matched) — same 119 OOF months for every model (naive/ew restricted to the trained-model window for apples-to-apples comparison)
+
+| model | bucket | n | win % | median | mean | mean win | mean loss | win/loss ratio | worst |
+|---|---|---|---|---|---|---|---|---|---|
+| gbm_rank | decile | 2,805 | +53.98% | +2.22% | -0.58% | +12.81% | -16.28% | 0.79 | -221.43% |
+| ew | decile | 2,805 | +53.51% | +1.89% | -0.33% | +12.58% | -15.18% | 0.83 | -250.00% |
+| logit | decile | 2,805 | +51.73% | +0.78% | -0.62% | +11.53% | -13.64% | 0.84 | -221.43% |
+| gbm_cls | decile | 2,805 | +49.98% | +0.00% | -1.19% | +9.78% | -12.15% | 0.81 | -125.00% |
+| naive | decile | 2,805 | +48.24% | -0.15% | -0.61% | +9.76% | -10.28% | 0.95 | -134.11% |
+| gbm_rank | quintile | 5,612 | +52.55% | +1.42% | -0.80% | +12.44% | -15.45% | 0.81 | -221.43% |
+| ew | quintile | 5,612 | +52.26% | +1.19% | -0.55% | +12.12% | -14.43% | 0.84 | -250.00% |
+| logit | quintile | 5,612 | +51.23% | +0.54% | -0.55% | +10.99% | -12.68% | 0.87 | -221.43% |
+| gbm_cls | quintile | 5,612 | +49.98% | +0.00% | -0.81% | +9.82% | -11.43% | 0.86 | -145.84% |
+| naive | quintile | 5,612 | +49.00% | +0.00% | -0.53% | +9.54% | -10.20% | 0.94 | -134.11% |
+| gbm_rank | tercile | 9,259 | +51.73% | +0.98% | -0.76% | +11.82% | -14.24% | 0.83 | -221.43% |
+| ew | tercile | 9,259 | +50.90% | +0.51% | -0.69% | +11.47% | -13.30% | 0.86 | -359.18% |
+| logit | tercile | 9,259 | +49.78% | +0.00% | -0.80% | +10.60% | -12.10% | 0.88 | -221.43% |
+| gbm_cls | tercile | 9,259 | +49.59% | +0.00% | -0.74% | +9.53% | -10.85% | 0.88 | -221.43% |
+| naive | tercile | 9,259 | +48.32% | +0.00% | -0.71% | +9.30% | -10.06% | 0.92 | -359.18% |
+| gbm_rank | top-10 | 1,190 | +56.13% | +3.38% | +0.17% | +13.33% | -16.66% | 0.80 | -191.35% |
+| logit | top-10 | 1,190 | +54.37% | +1.95% | -0.69% | +11.66% | -15.41% | 0.76 | -221.43% |
+| ew | top-10 | 1,190 | +51.26% | +0.99% | -0.99% | +13.17% | -15.89% | 0.83 | -200.00% |
+| gbm_cls | top-10 | 1,190 | +50.67% | +0.38% | -0.87% | +9.98% | -12.01% | 0.83 | -125.00% |
+| naive | top-10 | 1,190 | +49.24% | +0.00% | -0.28% | +10.02% | -10.28% | 0.97 | -80.95% |
+| gbm_rank | top-5 | 595 | +57.48% | +3.42% | +0.77% | +13.14% | -15.95% | 0.82 | -191.35% |
+| logit | top-5 | 595 | +55.46% | +2.27% | -0.19% | +11.71% | -15.00% | 0.78 | -191.35% |
+| ew | top-5 | 595 | +52.44% | +1.82% | -1.38% | +13.56% | -17.85% | 0.76 | -200.00% |
+| gbm_cls | top-5 | 595 | +48.57% | +0.00% | -1.21% | +9.98% | -11.79% | 0.85 | -125.00% |
+| naive | top-5 | 595 | +47.73% | -0.52% | -0.76% | +10.07% | -10.65% | 0.95 | -63.04% |
+
+## IS (raw) — naive/ew on full 156-month IS panel, trained models on 119-month OOF panel (NOT directly comparable)
 
 | model | bucket | n | win % | median | mean | mean win | mean loss | win/loss ratio | worst |
 |---|---|---|---|---|---|---|---|---|---|
@@ -70,7 +100,7 @@ Per-model, per-bucket short-position outcomes. Every position is a single (Date,
 | naive | top-5 | 780 | +49.36% | -0.02% | -0.52% | +9.64% | -10.42% | 0.93 | -63.04% |
 | gbm_cls | top-5 | 595 | +48.57% | +0.00% | -1.21% | +9.98% | -11.79% | 0.85 | -125.00% |
 
-## ALL
+## ALL — naive/ew on 191 months, trained models on 154 (NOT directly comparable)
 
 | model | bucket | n | win % | median | mean | mean win | mean loss | win/loss ratio | worst |
 |---|---|---|---|---|---|---|---|---|---|

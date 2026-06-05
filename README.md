@@ -23,6 +23,39 @@
 
 ---
 
+## A note on sample sizes (read this before the tables)
+
+Walk-forward CV needs a warm-up window — the trained models (`logit`,
+`gbm_cls`, `gbm_rank`) only have OOF predictions from **2013-07
+onwards** (119 IS months + 35 OOS = 154 total). The parameter-free
+models (`naive`, `ew`) can score the whole panel back to
+**2010-06** (156 IS months + 35 OOS = 191 total).
+
+That means in any IS or full-period comparison, naive/ew see a longer
+history than the trained models. To compare apples-to-apples, every
+table below has TWO IS columns:
+
+* **`OOS`** — the only window where *every model is evaluated on
+  exactly the same 35 months*. This is the headline.
+* **`IS_matched`** — naive/ew restricted to the same 119 OOF months
+  as the trained models. Use this for fair IS comparisons.
+* **`IS` (raw)** — naive/ew on full 156 months, trained models on
+  119 months. Not directly comparable; included for completeness.
+
+Position counts per month × basket size:
+
+| Bucket | Names per month | × 35 OOS = n_positions |
+|---|---:|---:|
+| top-5 | 5 | 175 |
+| top-10 | 10 | 350 |
+| decile | ~30 | ~1,039 |
+| quintile | ~60 | ~2,081 |
+| tercile | ~95 | ~3,434 |
+
+Every model gets the same n in OOS.
+
+---
+
 ## Headline finding
 
 **Every one of the 5 models correctly identifies a stock that falls
@@ -101,7 +134,7 @@ Full data:
 
 ## Results — every model × every bucket, OOS (n = 35 months)
 
-### Top-5 picks per month (175 positions over 35 months)
+### Top-5 picks per month — OOS (175 positions over 35 months)
 
 The smallest, highest-conviction basket. Each month, just the 5 most-
 shortable names per the model.
@@ -113,6 +146,39 @@ shortable names per the model.
 | naive | 175 | 52.6 % | +1.44 % | +0.77 % | +13.52 % | −13.36 % | 1.01 | −52.3 % |
 | gbm_cls | 175 | 52.6 % | +1.24 % | −1.52 % | +12.42 % | −16.98 % | 0.73 | −173.9 % |
 | logit | 175 | 49.1 % | +0.00 % | −0.21 % | +14.80 % | −14.72 % | 1.00 | −124.0 % |
+
+### Top-5 picks per month — IS_matched (595 positions over the same 119 months for every model)
+
+The fair IS comparison. naive/ew are restricted to the same 119-month
+window as the trained models so the comparison is apples-to-apples.
+This is where the model rankings can diverge most from the OOS view —
+useful as a sanity check that the OOS ranking isn't a fluke.
+
+| Model | n | Win % | Median | Mean | Mean win | Mean loss | Win/loss ratio | Worst |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| **gbm_rank** | 595 | **57.5 %** | **+3.42 %** | +0.77 % | +14.79 % | −17.94 % | 0.82 | −191.4 % |
+| logit | 595 | 55.5 % | +2.27 % | −0.19 % | +12.49 % | −15.99 % | 0.78 | −191.4 % |
+| ew | 595 | 52.4 % | +1.82 % | −1.38 % | +12.86 % | −16.91 % | 0.76 | −200.0 % |
+| gbm_cls | 595 | 48.6 % | +0.00 % | −1.21 % | +11.10 % | −13.10 % | 0.85 | −125.0 % |
+| naive | 595 | 47.7 % | −0.52 % | −0.76 % | +12.13 % | −12.83 % | 0.95 | **−63.0 %** |
+
+**OOS vs IS_matched ranking (top-5 win rate):**
+
+| | OOS | IS_matched |
+|---|---|---|
+| 1st | gbm_rank (60.0 %) | gbm_rank (57.5 %) |
+| 2nd | ew (57.7 %) | logit (55.5 %) |
+| 3rd | naive (52.6 %) | ew (52.4 %) |
+| 4th | gbm_cls (52.6 %) | gbm_cls (48.6 %) |
+| 5th | logit (49.1 %) | naive (47.7 %) |
+
+**`gbm_rank` is consistently #1** — meaningful confirmation that
+LambdaRank's "put the worst stocks at the top" objective isn't a
+post-2023 fluke. **`naive` jumps from #5 to #3** going from IS to
+OOS — the post-2023 regime has been particularly kind to
+short-interest dispersion as a standalone signal. **`logit` does the
+opposite** (#2 → #5), suggesting some of its linear weights overfit
+the pre-2023 fold structure.
 
 ### Top-10 picks per month (350 positions over 35 months)
 

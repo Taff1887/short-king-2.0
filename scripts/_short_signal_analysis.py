@@ -191,6 +191,23 @@ def main() -> int:
         s.update({"model": model, "bucket": bucket, "period": "ALL"})
         rows.append(s)
 
+    # MATCHED-IS rollup: restrict naive/ew to the same IS month range as the
+    # trained models so the IS comparison is apples-to-apples (naive/ew
+    # naturally score the 37-month warm-up window the trained models can't,
+    # which makes their raw IS counts higher and not directly comparable).
+    trained_is_dates = positions.loc[
+        (positions["model"] == "logit") & (positions["period"] == "IS"), "Date"
+    ].unique()
+    if len(trained_is_dates):
+        trained_is_dates = pd.DatetimeIndex(sorted(trained_is_dates))
+        is_matched = positions[positions["Date"].isin(trained_is_dates)]
+        for (model, bucket), grp in is_matched.groupby(["model", "bucket"]):
+            s = _bucket_summary(grp)
+            if not s:
+                continue
+            s.update({"model": model, "bucket": bucket, "period": "IS_matched"})
+            rows.append(s)
+
     summary = pd.DataFrame(rows)
     cols_first = ["model", "bucket", "period", "n_positions", "win_rate_pct",
                   "mean_trade_pct", "median_trade_pct",
@@ -249,8 +266,18 @@ def main() -> int:
           "is bigger than average loss; <1 = losses dominate.",
           "* `worst` = single worst position (the big squeeze).",
           ""]
-    for period in ("OOS", "IS", "ALL"):
-        md += [f"\n## {period}\n", _md_table(period)]
+    period_titles = {
+        "OOS": "OOS — pure out-of-sample, n=35 months, same for every model",
+        "IS_matched": "IS (matched) — same 119 OOF months for every model "
+                       "(naive/ew restricted to the trained-model window for "
+                       "apples-to-apples comparison)",
+        "IS": "IS (raw) — naive/ew on full 156-month IS panel, trained "
+              "models on 119-month OOF panel (NOT directly comparable)",
+        "ALL": "ALL — naive/ew on 191 months, trained models on 154 (NOT "
+                "directly comparable)",
+    }
+    for period in ("OOS", "IS_matched", "IS", "ALL"):
+        md += [f"\n## {period_titles[period]}\n", _md_table(period)]
     md_path = settings.reports_dir / "short_signal_summary.md"
     md_path.write_text("\n".join(md), encoding="utf-8")
     logger.info(f"wrote {md_path}")
