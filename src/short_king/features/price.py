@@ -11,7 +11,7 @@ Public API:
     momentum_skip_1w(df, weeks)      -> Series (skip-1w momentum, used to neutralise
                                        1-week microstructure reversal)
     realised_vol(df, window)         -> Series (std of weekly returns)
-    max_drawdown_52w(df, window=52)  -> Series (rolling 52w max drawdown, <= 0)
+    max_drawdown_12m(df, window=52)  -> Series (rolling 52w max drawdown, <= 0)
     beta_to_market(df, market_col, window) -> Series (rolling beta on weekly returns)
     price_features_panel(df)         -> DataFrame copy of df with the full feature set
 """
@@ -48,7 +48,7 @@ def momentum_skip_1w(df: pd.DataFrame, *, weeks: int) -> pd.Series:
     """Skip-1-week momentum: ``adjClose[t-1] / adjClose[t-weeks-1] - 1``.
 
     Skipping the most recent week removes the well-known short-term reversal
-    effect that contaminates raw 12-week momentum.
+    effect that contaminates raw 3-month momentum.
     """
     g = _sorted(df).groupby(_TICKER, sort=False)[_PRICE]
     s = g.shift(1) / g.shift(weeks + 1) - 1.0
@@ -70,7 +70,7 @@ def realised_vol(df: pd.DataFrame, *, window: int = 4) -> pd.Series:
     return vol.reindex(df.index)
 
 
-def max_drawdown_52w(df: pd.DataFrame, *, window: int = 52) -> pd.Series:
+def max_drawdown_12m(df: pd.DataFrame, *, window: int = 52) -> pd.Series:
     """Rolling drawdown over a trailing ``window`` weeks: ``price / running_max - 1``.
 
     Values are in [-1, 0]: 0 means at a window high, -0.40 means 40% off the
@@ -125,9 +125,9 @@ def beta_to_market(
 def price_features_panel(df: pd.DataFrame) -> pd.DataFrame:
     """Return a copy of ``df`` with all price-derived features attached.
 
-    Adds: ``mom_1w``, ``mom_4w``, ``mom_12w``, ``mom_26w``, ``mom_52w``,
-    ``mom_12w_skip1``, ``vol_4w``, ``vol_12w``, ``drawdown_52w``, and
-    ``beta_52w`` (only if ``mkt_ret_1w`` is present on the input panel).
+    Adds: ``mom_1w``, ``mom_1m``, ``mom_3m``, ``mom_6m``, ``mom_12m``,
+    ``mom_3m_skip1m``, ``vol_1m``, ``vol_3m``, ``drawdown_12m``, and
+    ``beta_12m`` (only if ``mkt_ret_1w`` is present on the input panel).
 
     The input must carry ``Ticker``, ``Date`` and ``adjClose``. The output
     preserves the caller's row order; sorting is done internally for the
@@ -139,24 +139,24 @@ def price_features_panel(df: pd.DataFrame) -> pd.DataFrame:
 
     out = df.copy()
     out["mom_1w"] = momentum(out, weeks=1)
-    out["mom_4w"] = momentum(out, weeks=4)
-    out["mom_12w"] = momentum(out, weeks=12)
-    out["mom_26w"] = momentum(out, weeks=26)
-    out["mom_52w"] = momentum(out, weeks=52)
-    out["mom_12w_skip1"] = momentum_skip_1w(out, weeks=12)
-    out["vol_4w"] = realised_vol(out, window=4)
-    out["vol_12w"] = realised_vol(out, window=12)
-    out["drawdown_52w"] = max_drawdown_52w(out, window=52)
+    out["mom_1m"] = momentum(out, weeks=4)
+    out["mom_3m"] = momentum(out, weeks=12)
+    out["mom_6m"] = momentum(out, weeks=26)
+    out["mom_12m"] = momentum(out, weeks=52)
+    out["mom_3m_skip1m"] = momentum_skip_1w(out, weeks=12)
+    out["vol_1m"] = realised_vol(out, window=4)
+    out["vol_3m"] = realised_vol(out, window=12)
+    out["drawdown_12m"] = max_drawdown_12m(out, window=52)
 
     if "mkt_ret_1w" in out.columns:
-        out["beta_52w"] = beta_to_market(out, market_col="mkt_ret_1w", window=52)
+        out["beta_12m"] = beta_to_market(out, market_col="mkt_ret_1w", window=52)
     else:
-        logger.info("price_features_panel: 'mkt_ret_1w' absent - skipping beta_52w")
+        logger.info("price_features_panel: 'mkt_ret_1w' absent - skipping beta_12m")
 
     n_tkr = out[_TICKER].nunique()
     logger.info(
         f"price features: {len(out):,} rows x {n_tkr} tickers | "
-        f"added mom/vol/drawdown" + (" + beta_52w" if "beta_52w" in out.columns else "")
+        f"added mom/vol/drawdown" + (" + beta_12m" if "beta_12m" in out.columns else "")
     )
     return out
 
@@ -165,7 +165,7 @@ __all__ = [
     "momentum",
     "momentum_skip_1w",
     "realised_vol",
-    "max_drawdown_52w",
+    "max_drawdown_12m",
     "beta_to_market",
     "price_features_panel",
 ]

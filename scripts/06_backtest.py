@@ -28,7 +28,7 @@ from short_king.utils.logging import logger
 
 _DATE_COL = "Date"
 _TICKER_COL = "Ticker"
-_FWD_RET_COL = "fwd_ret_4w"
+_FWD_RET_COL = "fwd_ret_1m"
 
 
 def _parse_args() -> argparse.Namespace:

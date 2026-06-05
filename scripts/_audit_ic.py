@@ -13,13 +13,13 @@ import pandas as pd
 
 df = pd.read_parquet("data/processed/features.parquet")
 print(f"Panel: {len(df):,} rows, {df.shape[1]} cols, dates={df['Date'].nunique()}")
-fwd = df["fwd_ret_4w"]
-print(f"fwd_ret_4w: mean={fwd.mean():+.4f}, std={fwd.std():.4f}, "
+fwd = df["fwd_ret_1m"]
+print(f"fwd_ret_1m: mean={fwd.mean():+.4f}, std={fwd.std():.4f}, "
       f"non-null={fwd.notna().sum():,}")
 
 ew_cols = [
-    "short_pct_ff_rk", "ShortPct_rk", "si_z_52w_rk",
-    "mom_12w_rk", "vol_4w_rk",
+    "short_pct_ff_rk", "ShortPct_rk", "si_z_12m_rk",
+    "mom_3m_rk", "vol_1m_rk",
     "log_mktcap_rk",
     "pe_rk", "fcf_yield_rk",
     "roe_rk", "roic_rk",
@@ -54,7 +54,7 @@ def summarise(name: str, ic: pd.Series) -> None:
     print(f"  {name:32s} n={n:4d}  IC={mean:+.4f}  std={std:.4f}  t={t:+.2f}  hit={hit:.2%}")
 
 
-print("\n--- Per-factor IC of each EW input vs fwd_ret_4w ---")
+print("\n--- Per-factor IC of each EW input vs fwd_ret_1m ---")
 for c in ew_cols:
     summarise(c, per_date_ic(df[c], fwd, df["Date"]))
 
@@ -68,9 +68,9 @@ work = pd.DataFrame({"d": df["Date"].values, "s": raw_score.values})
 work["score"] = work.groupby("d")["s"].rank(pct=True)
 summarise("composite_reranked", per_date_ic(work["score"], fwd, df["Date"]))
 
-print("\n--- Sanity: is there any pool-wide leak? Pool Spearman of each EW input vs fwd_ret_4w ---")
+print("\n--- Sanity: is there any pool-wide leak? Pool Spearman of each EW input vs fwd_ret_1m ---")
 for c in ew_cols:
-    sub = df[[c, "fwd_ret_4w"]].dropna()
+    sub = df[[c, "fwd_ret_1m"]].dropna()
     if len(sub) < 2:
         continue
     pool = sub.corr(method="spearman").iloc[0, 1]

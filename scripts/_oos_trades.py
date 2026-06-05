@@ -42,8 +42,8 @@ from short_king.utils.logging import logger
 WHY_COLS: tuple[tuple[str, str], ...] = (
     ("ShortPct", "Short %"),
     ("ShortPct_rk", "SI rank"),
-    ("mom_12w_rk", "12w-mom rank"),
-    ("vol_4w_rk", "vol rank"),
+    ("mom_3m_rk", "3m-mom rank"),
+    ("vol_1m_rk", "vol rank"),
     ("log_mktcap_rk", "size rank"),
     ("pe_rk", "P/E rank"),
     ("fcf_yield_rk", "FCF-yld rank"),
@@ -56,9 +56,8 @@ WHY_COLS: tuple[tuple[str, str], ...] = (
 def _parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument("--model", default="logit",
-                   choices=("naive", "ew", "logit", "gbm_cls", "gbm_rank"),
-                   help="Which model's OOF scores to backtest at trade level (default logit "
-                        "- best OOS Sharpe among the trained models).")
+                   choices=("naive", "ew", "logit"),
+                   help="Which model's OOF scores to backtest at trade level (default logit).")
     p.add_argument("--n-buckets", type=int, default=5,
                    help="Quintiles by default (5); 10 for deciles.")
     p.add_argument("--top-n", type=int, default=20,

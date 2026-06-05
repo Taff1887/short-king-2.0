@@ -34,9 +34,9 @@ def main() -> None:
     # 3. Feature correlation matrix on a representative subset of *_rk cols
     chosen_features = [
         c for c in (
-            "short_pct_ff_rk", "ShortPct_rk", "si_z_52w_rk", "days_to_cover_rk",
-            "mom_1w_rk", "mom_4w_rk", "mom_12w_rk", "mom_26w_rk",
-            "vol_4w_rk", "vol_12w_rk",
+            "short_pct_ff_rk", "ShortPct_rk", "si_z_12m_rk", "days_to_cover_rk",
+            "mom_1w_rk", "mom_1m_rk", "mom_3m_rk", "mom_6m_rk",
+            "vol_1m_rk", "vol_3m_rk",
             "log_mktcap_rk", "adv_aud_rk", "turnover_pct_rk", "amihud_rk",
             "pe_rk", "pb_rk", "ev_ebitda_rk",
             "fcf_yield_rk", "earnings_yield_rk",
@@ -79,13 +79,13 @@ def main() -> None:
     # 6. Decile-return spread per model (mean fwd_ret by score decile)
     decile_records: list[dict] = []
     for model, g in oof.groupby("model"):
-        g = g.dropna(subset=["score", "fwd_ret_4w"])
+        g = g.dropna(subset=["score", "fwd_ret_1m"])
         if len(g) < 100:
             continue
         deciles = pd.qcut(g["score"], 10, labels=False, duplicates="drop")
-        means = g.groupby(deciles)["fwd_ret_4w"].mean()
+        means = g.groupby(deciles)["fwd_ret_1m"].mean()
         for d, r in means.items():
-            decile_records.append({"model": model, "decile": int(d), "mean_fwd_ret_4w": float(r)})
+            decile_records.append({"model": model, "decile": int(d), "mean_fwd_ret_1m": float(r)})
     decile_df = pd.DataFrame(decile_records)
     if not decile_df.empty:
         try:
@@ -96,10 +96,10 @@ def main() -> None:
             # chart_decile_returns may not accept this exact shape.
             import matplotlib.pyplot as plt
             fig, ax = plt.subplots(figsize=(10, 5), dpi=200)
-            wide = decile_df.pivot_table(index="decile", columns="model", values="mean_fwd_ret_4w")
+            wide = decile_df.pivot_table(index="decile", columns="model", values="mean_fwd_ret_1m")
             wide.plot(kind="bar", ax=ax)
             ax.set_xlabel("Score decile (0 = lowest predicted shortability, 9 = highest)")
-            ax.set_ylabel("Mean 4-week forward return")
+            ax.set_ylabel("Mean 1-month forward return")
             ax.set_title("Forward-return spread by score decile (out-of-fold)")
             ax.axhline(0, color="black", linewidth=0.7)
             ax.grid(axis="y", linestyle=":", alpha=0.5)
@@ -108,15 +108,8 @@ def main() -> None:
             plt.close(fig)
             logger.info(f"wrote decile_returns.png (manual fallback, reason: {exc})")
 
-    # 7. Calibration plot for the GBM classifier
-    cal_csv = settings.reports_dir / "calibration_gbm_cls.csv"
-    if cal_csv.exists():
-        cal = pd.read_csv(cal_csv)
-        try:
-            rc.chart_calibration(cal, out / "calibration_gbm_cls.png")
-            logger.info("wrote calibration_gbm_cls.png")
-        except Exception as exc:
-            logger.warning(f"chart_calibration failed: {exc}")
+    # (Previously: GBM calibration plot. GBM models were removed from the
+    # project.)
 
 
 if __name__ == "__main__":

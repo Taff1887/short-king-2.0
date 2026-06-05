@@ -1,6 +1,6 @@
 # Data audit — short-king-2.0
 
-_Generated 2026-06-05 02:40 UTC_
+_Generated 2026-06-05 03:27 UTC_
 
 ## 1. Universe coverage
 - **asic_long**: 262,251 rows | 500 unique tickers | 833 dates | window 2010-06-14 → 2026-05-25
@@ -90,8 +90,8 @@ _Generated 2026-06-05 02:40 UTC_
 - min: 0  max: 268,473
 
 - **fwd_ret_1w**: n=192,221, mean=+0.0022, std=0.0716, |ret|>200% outliers=2, max=2.37, min=-0.97
-- **fwd_ret_4w**: n=191,310, mean=+0.0094, std=0.1467, |ret|>200% outliers=27, max=3.59, min=-0.97
-- **fwd_ret_12w**: n=188,908, mean=+0.0277, std=0.2643, |ret|>200% outliers=244, max=9.38, min=-0.97
+- **fwd_ret_1m**: n=191,310, mean=+0.0094, std=0.1467, |ret|>200% outliers=27, max=3.59, min=-0.97
+- **fwd_ret_3m**: n=188,908, mean=+0.0277, std=0.2643, |ret|>200% outliers=244, max=9.38, min=-0.97
 
 ## 3. FMP vs Yahoo Finance cross-check (monthly returns)
 

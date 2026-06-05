@@ -34,10 +34,10 @@ Three columns side-by-side: **Raw** (no stop), **Realistic** (20 % trigger + 10 
 
 |  | Raw | Realistic (gap rule) | Simplified (-32 % cap) | Δ realistic | Δ simplified |
 |---|---:|---:|---:|---:|---:|
-| CAGR | +2.86 % | -19.12 % | +33.35 % | -21.98 pp | +30.50 pp |
-| Ann. vol | 18.51 % | 18.74 % | 14.48 % | +0.23 pp | -4.02 pp |
-| Sharpe | +0.242 | -1.031 | +2.079 | -1.273 | +1.837 |
-| MaxDD | -37.11 % | -51.21 % | -6.24 % | -14.10 pp | +30.87 pp |
+| CAGR | -27.64 % | -43.87 % | -5.61 % | -16.23 pp | +22.04 pp |
+| Ann. vol | 19.48 % | 22.26 % | 16.62 % | +2.78 pp | -2.86 pp |
+| Sharpe | -1.542 | -2.418 | -0.266 | -0.876 | +1.276 |
+| MaxDD | -62.48 % | -79.72 % | -35.04 % | -17.24 pp | +27.44 pp |
 
 ## Stop-status breakdown
 

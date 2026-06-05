@@ -22,9 +22,9 @@ survivorship-bias-free S&P 500 panel:
    entirely on US and document this as a known limitation in
    ``docs/methodology.md`` rather than fake a comparable signal.
 5. Re-target the model. On ASX the headline label is the
-   regression-style ``fwd_ret_4w``; on US we run the
+   regression-style ``fwd_ret_1m``; on US we run the
    :class:`short_king.models.baselines.GBM_cls` baseline against a *binary*
-   ``fwd_ret_4w`` target (sign of the 4-week forward return), so the
+   ``fwd_ret_1m`` target (sign of the 1-month forward return), so the
    robustness exercise tests the cross-sectional ranking machinery rather
    than parity of point predictions across markets.
 6. Compare factor loadings cross-market: line up the per-feature SHAP /

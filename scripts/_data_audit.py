@@ -136,7 +136,7 @@ if "mktCap" in clean.columns:
     w()
 
 # Forward-return outliers
-for col in ("fwd_ret_1w", "fwd_ret_4w", "fwd_ret_12w"):
+for col in ("fwd_ret_1w", "fwd_ret_1m", "fwd_ret_3m"):
     if col in clean.columns:
         s = pd.to_numeric(clean[col], errors="coerce").dropna()
         outliers = ((s.abs() > 2.0).sum())   # > 200 %

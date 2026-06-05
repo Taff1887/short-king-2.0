@@ -135,7 +135,7 @@ def main() -> int:
     clean = clean_lc.rename(columns=_FROM_CLEAN)
     write_clean(clean, settings.processed_dir / "master_clean.parquet")
 
-    # 3) Feature matrix (computed weekly so rolling windows like vol_4w stay
+    # 3) Feature matrix (computed weekly so rolling windows like vol_1m stay
     # meaningful even when we later downsample to monthly for modelling).
     features = build_feature_panel(
         clean,

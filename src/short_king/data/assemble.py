@@ -41,6 +41,16 @@ from short_king.utils.logging import logger
 DEFAULT_MIN_MKT_CAP_AUD = 100_000_000  # A$100m liquidity gate
 DEFAULT_MAX_FILING_STALE_QUARTERS = 4
 
+
+def _weeks_to_month_label(weeks: int) -> str:
+    """Map a week-count horizon to a month-style label used throughout the project.
+
+    4 weeks -> '1m', 12 weeks -> '3m', 26 weeks -> '6m', 52 weeks -> '12m'.
+    The 1w horizon stays as '1w' (it's sub-monthly and useful as a noise
+    check). Any other value falls back to ``{N}w``.
+    """
+    return {1: "1w", 4: "1m", 12: "3m", 26: "6m", 52: "12m"}.get(weeks, f"{weeks}w")
+
 # Calendar-week tolerance for the price as-of join (ASIC Date is a Friday; the
 # market may have been shut, so the previous trading day is accepted).
 PRICE_TOLERANCE_DAYS = 7
@@ -204,9 +214,14 @@ def _forward_returns_from_prices(
         )
         joined = joined[["Symbol", "Date", "_fwd_px"]]
         merged = base.merge(joined, on=["Symbol", "Date"], how="left")
-        out[f"fwd_ret_{h}w"] = merged["_fwd_px"] / merged["adjClose"] - 1.0
+        # Use month-style column names (4w -> 1m, 12w -> 3m, 1w -> 1w stays):
+        # the monthly rebalance grid maps ~4 calendar weeks to one rebalance
+        # period, so we present the forward-return labels in months for
+        # consistency with the rest of the project.
+        month_label = _weeks_to_month_label(h)
+        out[f"fwd_ret_{month_label}"] = merged["_fwd_px"] / merged["adjClose"] - 1.0
 
-    ret_cols = [f"fwd_ret_{h}w" for h in horizons_weeks]
+    ret_cols = [f"fwd_ret_{_weeks_to_month_label(h)}" for h in horizons_weeks]
     out[ret_cols] = out[ret_cols].replace([np.inf, -np.inf], np.nan)
     return out
 
@@ -478,7 +493,7 @@ def assemble_pit_panel(
         "volume",
         "mktCap",
         "sharesOutstanding",
-        *[f"fwd_ret_{h}w" for h in forward_horizons_weeks],
+        *[f"fwd_ret_{_weeks_to_month_label(h)}" for h in forward_horizons_weeks],
     ]
     # Add any declared cols that the input did not carry (e.g. sector if a
     # profile attach hasn't happened yet) as NaN so the schema is stable.

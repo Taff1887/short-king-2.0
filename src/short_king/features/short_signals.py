@@ -7,11 +7,11 @@ v1 short-king prototype relied on:
 * a clean **free-float-based** short interest (denominator = freely tradeable
   shares, not just shares outstanding) — institutionally the standard,
 * **days-to-cover** — the squeeze proxy traders actually quote,
-* a rolling **52-week z-score and percentile** of short interest — captures
+* a rolling **12-month z-score and percentile** of short interest — captures
   how stretched the current short book is *relative to that name's own
   history*, which matters far more than the raw level (some names are
   structurally heavily-shorted),
-* a short-term **persistence** count and a **4-week build rate** — capture
+* a short-term **persistence** count and a **1-month build rate** — capture
   *direction and conviction* of the short book, not just level.
 
 All rolling/diff features assume the input is sorted by ``[Ticker, Date]`` and
@@ -28,10 +28,10 @@ from short_king.utils.logging import logger
 __all__ = [
     "short_pct_free_float",
     "days_to_cover",
-    "si_z_52w",
-    "si_percentile_52w",
+    "si_z_12m",
+    "si_percentile_12m",
     "si_persistence",
-    "si_build_rate_4w",
+    "si_build_rate_1m",
     "short_signals_panel",
 ]
 
@@ -133,8 +133,8 @@ def days_to_cover(df: pd.DataFrame, *, window_days: int = 20) -> pd.Series:
     return out.rename("days_to_cover")
 
 
-# --- 3. Rolling 52-week z-score of ShortPct ------------------------------
-def si_z_52w(df: pd.DataFrame, *, window: int = 52) -> pd.Series:
+# --- 3. Rolling 12-month z-score of ShortPct ------------------------------
+def si_z_12m(df: pd.DataFrame, *, window: int = 52) -> pd.Series:
     """Per-ticker rolling z-score of ``ShortPct`` over ``window`` periods.
 
     ``(x_t - mean_window) / std_window``. A positive z says the current short
@@ -143,7 +143,7 @@ def si_z_52w(df: pd.DataFrame, *, window: int = 52) -> pd.Series:
     reversals. ``min_periods`` is set to roughly a quarter of the window so
     we don't emit volatile estimates on too little data.
     """
-    _require(df, [_TICKER, _SHORT_PCT], "si_z_52w")
+    _require(df, [_TICKER, _SHORT_PCT], "si_z_12m")
     min_periods = max(2, window // 4)
 
     si = pd.to_numeric(df[_SHORT_PCT], errors="coerce")
@@ -156,21 +156,21 @@ def si_z_52w(df: pd.DataFrame, *, window: int = 52) -> pd.Series:
         return z.replace([np.inf, -np.inf], np.nan)
 
     out = si.groupby(df[_TICKER]).transform(_z)
-    return out.rename("si_z_52w")
+    return out.rename("si_z_12m")
 
 
 # --- 4. Rolling percentile of ShortPct -----------------------------------
-def si_percentile_52w(
+def si_percentile_12m(
     df: pd.DataFrame, *, window: int = 52, min_periods: int = 12
 ) -> pd.Series:
     """Per-ticker rolling percentile of ``ShortPct`` over ``window``.
 
-    Where current short interest sits in its own 52-week distribution —
+    Where current short interest sits in its own 12-month distribution —
     distribution-free (so it's robust to fat tails and outliers, unlike the
     z-score) and the v1 prototype's preferred crowding signal.
     Returned values are in [0, 1].
     """
-    _require(df, [_TICKER, _SHORT_PCT], "si_percentile_52w")
+    _require(df, [_TICKER, _SHORT_PCT], "si_percentile_12m")
 
     si = pd.to_numeric(df[_SHORT_PCT], errors="coerce")
 
@@ -180,7 +180,7 @@ def si_percentile_52w(
         )
 
     out = si.groupby(df[_TICKER]).transform(_pct)
-    return out.rename("si_percentile_52w")
+    return out.rename("si_percentile_12m")
 
 
 # --- 5. Persistence: number of up weeks in a trailing window -------------
@@ -209,20 +209,20 @@ def si_persistence(df: pd.DataFrame, *, window: int = 5) -> pd.Series:
     return out.rename("si_persistence")
 
 
-# --- 6. 4-week build rate ------------------------------------------------
-def si_build_rate_4w(df: pd.DataFrame, *, window: int = 4) -> pd.Series:
+# --- 6. 1-month build rate ------------------------------------------------
+def si_build_rate_1m(df: pd.DataFrame, *, window: int = 4) -> pd.Series:
     """Per-ticker ``ShortPct - ShortPct.shift(window)``.
 
-    The raw 4-week change in short interest (in percentage points). Pairs
+    The raw 1-month change in short interest (in percentage points). Pairs
     naturally with ``si_persistence``: build rate gives *magnitude*,
     persistence gives *conviction*. NaN for the first ``window`` rows of
     each ticker.
     """
-    _require(df, [_TICKER, _SHORT_PCT], "si_build_rate_4w")
+    _require(df, [_TICKER, _SHORT_PCT], "si_build_rate_1m")
 
     si = pd.to_numeric(df[_SHORT_PCT], errors="coerce")
     out = si.groupby(df[_TICKER]).transform(lambda s: s - s.shift(window))
-    return out.rename("si_build_rate_4w")
+    return out.rename("si_build_rate_1m")
 
 
 # --- 7. Panel assembler --------------------------------------------------
@@ -238,18 +238,18 @@ def short_signals_panel(df: pd.DataFrame) -> pd.DataFrame:
     out = df.copy()
     out["short_pct_ff"] = short_pct_free_float(out)
     out["days_to_cover"] = days_to_cover(out)
-    out["si_z_52w"] = si_z_52w(out)
-    out["si_percentile_52w"] = si_percentile_52w(out)
+    out["si_z_12m"] = si_z_12m(out)
+    out["si_percentile_12m"] = si_percentile_12m(out)
     out["si_persistence"] = si_persistence(out)
-    out["si_build_rate_4w"] = si_build_rate_4w(out)
+    out["si_build_rate_1m"] = si_build_rate_1m(out)
 
     new_cols = [
         "short_pct_ff",
         "days_to_cover",
-        "si_z_52w",
-        "si_percentile_52w",
+        "si_z_12m",
+        "si_percentile_12m",
         "si_persistence",
-        "si_build_rate_4w",
+        "si_build_rate_1m",
     ]
     coverage = (out[new_cols].notna().mean() * 100).round(1)
     logger.info(

@@ -21,7 +21,7 @@ print(f"df_is rows: {len(df_is):,}, dates: {df_is['Date'].nunique()}")
 # Build feature cols + label.
 feat_cols = [c for c in df_is.columns if c.endswith("_rk") or c.startswith("sec_")]
 print(f"feature cols: {len(feat_cols)}")
-fwd_col = "fwd_ret_4w"
+fwd_col = "fwd_ret_1m"
 y_bin = (df_is[fwd_col] < 0).astype("float64").where(df_is[fwd_col].notna())
 
 # Walk-forward.

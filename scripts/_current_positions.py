@@ -20,8 +20,8 @@ from short_king.utils.config import settings
 from short_king.utils.io import read_parquet
 from short_king.utils.logging import logger
 
-TRAINED_MODELS = ("logit", "gbm_cls", "gbm_rank")
-MIN_MKT_CAP_AUD = 200_000_000
+TRAINED_MODELS = ("naive", "ew", "logit")
+MIN_MKT_CAP_AUD = 100_000_000
 MIN_FULL_COVERAGE_FRAC = 0.7   # logit must score >= 70 % of the day's universe
 TOP_N_CSV = 30
 TOP_N_MD = 15
@@ -123,14 +123,14 @@ def main() -> None:
     md_cols = [
         "short_rank", "Ticker", "Company", "sector",
         "mktCap_AUDm", "ShortPct",
-        "score_logit", "score_gbm_cls", "score_gbm_rank", "consensus_rank",
+        "score_naive", "score_ew", "score_logit", "consensus_rank",
     ]
     out["mktCap_AUDm"] = (out["mktCap"] / 1e6).round(0)
 
     csv_cols = [
         "short_rank", "Ticker", "Company", "sector", "industry",
         "mktCap", "mktCap_AUDm", "ShortPct", "adjClose",
-        "score_logit", "score_gbm_cls", "score_gbm_rank", "consensus_rank",
+        "score_naive", "score_ew", "score_logit", "consensus_rank",
     ]
     csv_cols = [c for c in csv_cols if c in out.columns]
     out_csv = out[csv_cols].head(TOP_N_CSV)
@@ -144,9 +144,9 @@ def main() -> None:
     # Tidy numeric formatting for the markdown.
     fmt_map = {
         "ShortPct": "{:.2f}",
+        "score_naive": "{:.3f}",
+        "score_ew": "{:.3f}",
         "score_logit": "{:.3f}",
-        "score_gbm_cls": "{:.3f}",
-        "score_gbm_rank": "{:.3f}",
         "consensus_rank": "{:.3f}",
         "mktCap_AUDm": "{:,.0f}",
     }
