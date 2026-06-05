@@ -1,8 +1,8 @@
 # Top 15 short candidates — as of 2026-05-29
 
-Ranked by **consensus rank** of three trained models (logit + GBM classifier + GBM LambdaRank). Higher rank = stronger short conviction (all three models agree the name is in the bearish tail).
+Ranked by **consensus rank** across the three models (naive + ew + logit). Higher rank = stronger short conviction (all three models agree the name is in the bearish tail).
 
-_Investable gate: A$200m mkt cap, fundamentals present, not flagged as corrupted. Universe size at as-of: 272 names._
+_Investable gate: A$100m mkt cap, fundamentals present, not flagged as corrupted. Universe size at as-of: 272 names._
 
 | short_rank | Ticker | Company | sector | mktCap_AUDm | ShortPct | score_naive | score_ew | score_logit | consensus_rank |
 |---|---|---|---|---|---|---|---|---|---|

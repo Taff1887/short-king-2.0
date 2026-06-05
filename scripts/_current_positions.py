@@ -162,10 +162,10 @@ def main() -> None:
     md_path = settings.reports_dir / out_md_name
     header = (
         f"# Top {TOP_N_MD} short candidates — as of {as_of.date()}\n\n"
-        f"Ranked by **consensus rank** of three trained models (logit + GBM "
-        f"classifier + GBM LambdaRank). Higher rank = stronger short conviction "
+        f"Ranked by **consensus rank** across the three models "
+        f"(naive + ew + logit). Higher rank = stronger short conviction "
         f"(all three models agree the name is in the bearish tail).\n\n"
-        f"_Investable gate: A$200m mkt cap, fundamentals present, not flagged "
+        f"_Investable gate: A$100m mkt cap, fundamentals present, not flagged "
         f"as corrupted. Universe size at as-of: {len(out)} names._\n\n"
     )
     try:

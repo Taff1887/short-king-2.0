@@ -460,30 +460,117 @@ A reader-friendly walkthrough of the metrics on this page.
 
 ---
 
-## Universe — what's in / what's out
+## Current short basket — what's being shorted, and why
 
-**The universe includes every ASX 50 mega-cap.** On the latest rebalance
-(29 May 2026) the panel spans market caps from **A$9 m to A$268 B** —
-CBA, RIO, BHP, all four banks, CSL, MQG, TLS all present:
+_As of 2026-05-29 (most recent monthly rebalance)._ Ranked by **naive
+score** (the highest-Sharpe non-benchmark strategy: rank by reported
+short interest). The per-factor polarity-aware ranks alongside show
+**why** each name is shortable across the EW composite's 12 signals
+— every cell is **0 – 1 where 1 = most shortable** on that factor.
 
-| # | Ticker | Mkt Cap (A$bn) | Short % |
-|---:|---|---:|---:|
-| 1 | CBA | 268.5 | 2.1 |
-| 2 | RIO | 159.3 | 8.7 |
-| 3 | BHP | 154.1 | 1.4 |
-| 4 | WBC | 134.8 | 1.8 |
-| 5 | NAB | 126.8 | 1.8 |
-| 6 | ANZ | 107.8 | 0.8 |
-| 7 | WES | 92.0 | 1.1 |
-| 8 | CSL | 83.5 | 0.7 |
-| 9 | MQG | 76.7 | 0.4 |
-| 10 | TLS | 55.3 | 0.9 |
+**Score columns:**
 
-The strategy *can* short these names; they just rarely make it into the
-top-quintile short basket because mega-cap SI is low (CBA 2.1 %,
-BHP 1.4 %) and their quality metrics rank them as least-shortable.
-**RIO at 8.7 % is the exception** — high SI on a mega-cap is the kind
-of signal the strategy will pick up.
+* `score_naive` — rank of `ShortPct` across the cross-section
+  (higher = more crowded short).
+* `score_ew` — polarity-aware equal-weight composite of 12 ranks
+  (higher = bearish across many dimensions).
+* `score_logit` — L2 logistic regression `Pr(monthly return < 0)`.
+
+**Factor columns (all 0 – 1, higher = more shortable; `(inv)` =
+naturally bullish raw rank flipped via `1 − rank`):**
+
+* `SI %` — raw short-interest % rank.
+* `SI z` — 12-month short-interest z-score rank.
+* `3m-mom (inv)` — low 3-month momentum.
+* `vol` — high 1-month realised volatility.
+* `P/E` — expensive valuation.
+* `FCF-yld (inv)` — low free-cash-flow yield.
+* `ROE (inv)` — low return on equity.
+* `D/E` — high leverage.
+* `rev-gth (inv)` — low or negative year-on-year revenue growth.
+
+| # | Ticker | Company | Mkt Cap (A$m) | Short % | naive | ew | logit | SI % | SI z | 3m-mom (inv) | vol | P/E | FCF-yld (inv) | ROE (inv) | D/E | rev-gth (inv) | EW factor avg |
+|---:|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| 1 | LOT | Lotus Resources | 450 | **19.54** | **1.000** | **1.000** | 0.606 | 1.00 | 0.98 | 0.99 | 0.71 | 0.50 | 0.96 | 0.87 | 0.16 | 0.98 | **0.794** |
+| 2 | DMP | Domino's Pizza Enterprises | 1,984 | 15.20 | 0.997 | 0.786 | 0.596 | 1.00 | 0.56 | 0.53 | 0.54 | 0.59 | 0.17 | 0.33 | 0.90 | 0.78 | 0.599 |
+| 3 | TLX | Telix Pharmaceuticals | 3,794 | 15.15 | 0.993 | 0.845 | 0.584 | 0.99 | 0.70 | 0.09 | 0.42 | 0.50 | 0.79 | 0.72 | 0.81 | 0.42 | 0.604 |
+| 4 | BOE | Boss Energy | 610 | 14.33 | 0.990 | 0.648 | 0.475 | 0.99 | 0.22 | 0.81 | 0.26 | 0.50 | 0.47 | 0.76 | 0.05 | 0.02 | 0.453 |
+| 5 | TWE | Treasury Wine Estates | 4,244 | 13.07 | 0.986 | 0.900 | 0.473 | 0.99 | 0.66 | 0.44 | 0.51 | 0.50 | 0.53 | 0.91 | 0.64 | 0.84 | 0.669 |
+| 6 | PLS | Pilbara Minerals | 13,590 | 11.53 | 0.983 | 0.597 | 0.539 | 0.98 | 0.48 | 0.04 | 0.38 | **0.98** | 0.61 | 0.66 | 0.41 | 0.07 | 0.514 |
+| 7 | CAR | CAR Group | 11,632 | 11.24 | 0.979 | 0.728 | 0.474 | 0.98 | 0.91 | 0.52 | 0.33 | 0.79 | 0.41 | 0.40 | 0.59 | 0.51 | 0.606 |
+| 8 | FLT | Flight Centre Travel | 3,210 | 10.77 | 0.976 | **0.945** | 0.581 | 0.98 | 0.58 | 0.63 | 0.71 | 0.65 | 0.79 | 0.40 | 0.81 | 0.78 | **0.704** |
+| 9 | PDN | Paladin Energy | 1,869 | 10.63 | 0.972 | 0.852 | 0.508 | 0.97 | 0.27 | 0.57 | 0.86 | 0.50 | 0.64 | 0.81 | 0.38 | 0.13 | 0.571 |
+| 10 | 4DX | 4D Medical | 1,948 | 10.06 | 0.969 | 0.812 | 0.549 | 0.97 | **0.99** | 0.61 | **0.99** | 0.50 | 0.71 | 0.00 | 0.01 | 0.06 | 0.539 |
+| 11 | LYC | Lynas Rare Earths | 12,191 | 9.97 | 0.966 | 0.659 | 0.361 | 0.97 | 0.67 | 0.30 | 0.59 | 0.92 | 0.57 | 0.57 | 0.26 | 0.11 | 0.549 |
+| 12 | HLS | Healius | 657 | 9.55 | 0.962 | **0.993** | **0.613** | 0.96 | 0.92 | 0.96 | 0.97 | 0.50 | 0.06 | 0.83 | **0.93** | 0.58 | **0.745** |
+| 13 | BPT | Beach Energy | 2,691 | 9.50 | 0.959 | 0.607 | 0.482 | 0.96 | 0.83 | 0.55 | 0.56 | 0.10 | 0.14 | 0.43 | 0.39 | 0.74 | 0.522 |
+| 14 | BAP | Bapcor | 703 | 9.41 | 0.955 | **0.986** | **0.673** | 0.96 | 0.71 | 0.96 | 0.98 | 0.50 | 0.17 | 0.90 | 0.79 | 0.57 | **0.726** |
+| 15 | CUV | Clinuvel Pharmaceuticals | 625 | 9.38 | 0.952 | 0.772 | 0.515 | 0.95 | 0.64 | 0.65 | 0.25 | 0.71 | 0.40 | 0.46 | 0.06 | 0.96 | 0.565 |
+
+### How to read this table
+
+* **A row of mostly bold / dark cells** = the name is shortable across
+  *multiple* dimensions. These are the multi-factor shorts the EW
+  composite is built to find — crowded SI + falling momentum + low
+  quality + high leverage all at once. `LOT` (EW factor avg 0.79),
+  `HLS` (0.75), `BAP` (0.73), `FLT` (0.70) are the cleanest examples
+  on this rebalance.
+
+* **A row with high SI columns but low fundamentals columns** = a
+  "pure crowded-short" play. Naive ranks it highly because `score_naive`
+  is just the SI rank, but EW down-weights it because the quality /
+  valuation / momentum signals don't agree. `BOE` (Boss Energy) is a
+  good example here — 99th-percentile SI but only 0.45 EW-factor-avg
+  because momentum is high (positive uranium sentiment) and
+  leverage is low.
+
+* **A row with low `EW factor avg` despite a top-15 spot** flags the
+  names most exposed to squeeze risk — where naive is alone in pushing
+  the name onto the list. `PLS` (vol 0.98 but EW avg 0.51) is the
+  classic example: massive short interest, very volatile, but
+  fundamentals don't justify a bearish thesis. `BOE`, `4DX` (no
+  earnings, no growth, but high momentum) sit in the same bucket.
+
+### What the top picks have in common
+
+The four names with the highest EW factor average (`LOT 0.79`, `HLS
+0.75`, `BAP 0.73`, `FLT 0.70`) score above 0.85 on **at least seven of
+the nine polarity-aware factors**. Reading the rows row-by-row:
+
+* **LOT (Lotus Resources)** — A$450 m uranium developer. 19.5 % short
+  interest is the highest in the universe; SI z 0.98 means it's at
+  the top of its 12-month SI range; 3m-momentum rank inverted = 0.99
+  (i.e. price has been falling); revenue-growth-rank inverted = 0.98
+  (shrinking). Only D/E rank low (0.16) — a debt-free junior, which
+  is normal for pre-production explorers. The model sees a
+  cratering price + crowded short + no growth: a textbook bearish
+  setup.
+* **HLS (Healius)** — A$657 m diagnostics. SI 9.55 % with z = 0.92,
+  3m-momentum rank inverted 0.96, vol 0.97, ROE inverted 0.83 (low
+  ROE), D/E 0.93 (highly levered). Multi-factor bearish across
+  *almost every* dimension.
+* **BAP (Bapcor)** — A$703 m auto parts. 9.41 % SI, z 0.71, 3m-mom
+  inv 0.96, vol 0.98, ROE inv 0.90, D/E 0.79. Same playbook as HLS
+  — concentrated short + low quality + falling + levered.
+* **FLT (Flight Centre)** — A$3.2 bn travel. Broader signal lock:
+  expensive (P/E 0.79), low ROE (0.81), levered (0.81), shrinking
+  growth (0.78). The lower SI rank (0.58) is the only number
+  that's not screaming "short".
+
+### Why these names — not the ASX 50 mega-caps
+
+The universe **does include every ASX 50** (CBA at A$268 bn, RIO at
+A$159 bn, BHP at A$154 bn, all four banks, CSL, MQG, TLS). They just
+rarely make it into the short basket because mega-cap SI is low (CBA
+2.1 %, BHP 1.4 %, CSL 0.7 %) and their quality / valuation / leverage
+metrics rank them as **least-shortable** — they end up in the **long**
+quintile, not the short one. **RIO at 8.7 % SI** is the only mega-cap
+that occasionally drifts into the bearish tail.
+
+Live data, regenerate any time:
+[`reports/current_short_basket.csv`](reports/current_short_basket.csv) /
+[`reports/current_short_basket.md`](reports/current_short_basket.md)
+via `scripts/_current_short_basket.py`.
 
 ---
 
