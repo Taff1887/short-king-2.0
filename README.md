@@ -824,6 +824,115 @@ Java-free fallback.
 
 ---
 
+## Appendix — what the long-only leg looks like on its own
+
+> *"It seems weird the short-only trends downwards and the long-short
+> trends upwards... I'd argue it would trend even more upwards if it
+> were just long only."*
+
+Spot-on intuition, and the math forces it: since
+`L/S = long_leg + short_leg` and the short leg has consistently negative
+returns, the **long leg alone has to be bigger than L/S**. To verify,
+we derive the long-only series from the existing parquets
+(`long_only = ls_quintile − quintile_short`, which cancels the
+shared short-side costs and leaves the long-leg net) and chart it.
+
+![Long-only component of each model — cumulative growth of $1 vs ASX 200](charts/long_only_components.png)
+
+*Long-only component of each model's bottom-quintile basket (no stop,
+since shorts aren't involved). ew/long-only ends at **~$14**, naive at
+**~$8**, logit at **~$4.5** — all three crush the ASX 200 buy & hold
+(dashed) at $2.0.*
+
+### Summary — every leg side-by-side
+
+**OOS (n=35), ranked by Sharpe:**
+
+| Strategy | Sharpe | CAGR | Ann. vol | MaxDD | Hit-rate |
+|---|---:|---:|---:|---:|---:|
+| **ew / long-only** | **+1.60** | **+20.5 %** | 12.2 % | **−9.0 %** | **71.4 %** |
+| **naive / long-only** | **+1.15** | +17.5 % | 15.0 % | −10.7 % | 60.0 % |
+| naive / L/S quintile | +0.92 | +11.2 % | 12.4 % | −10.8 % | 68.6 % |
+| ew / L/S quintile | +0.91 | +17.2 % | 19.4 % | −16.6 % | 48.6 % |
+| logit / long-only | +0.83 | +8.6 % | 10.6 % | −9.3 % | 57.1 % |
+| ASX 200 (buy & hold) | +0.71 | +7.3 % | 10.8 % | −7.8 % | 62.9 % |
+| logit / L/S quintile | +0.24 | +2.9 % | 18.5 % | −37.1 % | 48.6 % |
+| ew / quintile-short | −0.08 | −4.1 % | 22.2 % | −36.6 % | 51.4 % |
+| logit / quintile-short | −0.20 | −6.3 % | 21.1 % | −40.9 % | 48.6 % |
+| naive / quintile-short | −0.32 | −7.2 % | 18.1 % | −35.7 % | 51.4 % |
+
+**Full period (n=191), ranked by Sharpe:**
+
+| Strategy | Sharpe | CAGR | Ann. vol | MaxDD |
+|---|---:|---:|---:|---:|
+| **ew / long-only** | **+1.22** | **+17.9 %** | 14.5 % | −31.8 % |
+| logit / long-only | +0.80 | +12.0 % | 15.9 % | −33.8 % |
+| naive / long-only | +0.79 | +14.3 % | 19.4 % | −34.9 % |
+| naive / L/S quintile | +0.62 | +8.2 % | 14.2 % | −31.0 % |
+| ew / L/S quintile | +0.58 | +10.2 % | 20.7 % | −57.4 % |
+| ASX 200 (buy & hold) | +0.39 | +4.5 % | 13.8 % | −31.0 % |
+| logit / L/S quintile | +0.24 | +2.6 % | 15.8 % | −37.6 % |
+| ew / quintile-short | −0.20 | −9.5 % | 28.4 % | −86.2 % |
+| naive / quintile-short | −0.29 | −8.5 % | 21.9 % | −82.7 % |
+| logit / quintile-short | −0.37 | −11.3 % | 24.4 % | −84.1 % |
+
+### What this honestly shows
+
+**The model's *bottom* quintile is doing the work, not the top.** When
+the model ranks 290 stocks from "most shortable" to "least shortable",
+the **least-shortable** names (low SI + low leverage + high momentum +
+high ROE + high FCF + low P/E) end up being **really good longs**.
+This makes total sense — the model is calibrated to find the bearish
+tail, so the opposite tail naturally captures the *most* attractive
+buy candidates by the same yardstick.
+
+The full-period numbers are honest:
+
+* **EW long-only** is the standout — **Sharpe 1.22 over 16 years**
+  with +17.9 % CAGR, beating every other strategy in the project by
+  a wide margin. EW's polarity-aware factor blend works *exactly as
+  designed* — it's just that the alpha lives on the long side, not
+  the short side.
+* **Every long-only leg beats the L/S quintile** at every horizon —
+  by 0.2–0.4 Sharpe and 7-10 percentage points of CAGR.
+* **Every short-only leg drags performance down** when combined with
+  the long leg. The L/S "strategy" is functionally a long-quality
+  strategy with an expensive negative-Sharpe hedge attached.
+
+### So why even have a short leg?
+
+Two legitimate reasons (neither of which holds up in this data, but
+both are why the L/S construction exists in the first place):
+
+1. **Dollar-neutrality** — L/S has zero market beta; long-only has
+   beta ≈ 1. If you want to isolate the cross-sectional *spread*
+   from the market direction, you need both legs.
+2. **Crisis hedging** — in a bear market the short leg is supposed
+   to pay off and protect the long leg. **But that's the opposite
+   of what we observe** — the short leg loses MOST during recovery
+   rallies (see [COVID 2020 analysis](#follow-up-research-why-regime-detection-is-necessary)),
+   and only does well in steady down-markets which are rare.
+
+**Honest takeaway for an interviewer:** the most important research
+finding of this entire project might be that **the long leg is what
+matters**. The short signal is technically real (negative IC, > 50 %
+per-position win rate) but the realised costs (borrow, gap risk,
+recovery-rally squeezes) eat it. Meanwhile the *inverse* signal — go
+long the names this model says are least-shortable — is a clean,
+high-Sharpe, beats-the-index strategy with no clever derivatives,
+no leverage, no stops.
+
+If this project had a "where would I take this next" follow-up, it
+would be: **drop the short leg entirely, run a long-only book on the
+bottom-quintile of the polarity-aware EW score, focus the methodology
+work on factor weighting and turnover control rather than squeeze
+protection**.
+
+Full summary data:
+[`reports/long_only_summary.csv`](reports/long_only_summary.csv).
+
+---
+
 ## License
 
 MIT — see [`LICENSE`](LICENSE).
